@@ -1,0 +1,21 @@
+{
+  "best_mlp_activation": "ReLU",
+  "metrics": {
+    "FinBERT (pretrained)": {
+      "accuracy": 0.6666666666666666,
+      "f1_macro": 0.6192279942279942
+    },
+    "Logistic Regression (TF-IDF)": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0
+    },
+    "Random Forest (TF-IDF)": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0
+    },
+    "PyTorch MLP (ReLU)": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0
+    }
+  }
+}

@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Datos reales descargados de Binance Vision (se regeneran con
+# download_binance_data.py, no hace falta versionarlos)
+data/raw/*.csv
+!data/raw/.gitkeep
+
+# Historial de corridas del benchmark comparativo en DuckDB (se regenera con
+# db_persistence.py / compare_strategies.py, no hace falta versionarlo)
+outputs/backtest_history.duckdb
+
+CLAUDE.md
+.claude/

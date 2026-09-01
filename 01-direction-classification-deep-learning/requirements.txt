@@ -1,0 +1,15 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu
+polars==1.44.0
+scikit-learn==1.7.2
+seaborn==0.13.2
+matplotlib==3.10.9
+mplfinance==0.12.10b0
+pyarrow==25.0.1
+jupyter
+ipykernel
+nbconvert
+nbformat
+lightgbm
+duckdb
+pytest

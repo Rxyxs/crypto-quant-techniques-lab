@@ -1,0 +1,18 @@
+{
+  "accuracy": 0.5190126751167445,
+  "precision_bajista": 0.5201320132013202,
+  "recall_bajista": 0.5242847638057219,
+  "f1_bajista": 0.5222001325381047,
+  "precision_alcista": 0.5178691840863116,
+  "recall_alcista": 0.5137123745819397,
+  "f1_alcista": 0.5157824042981867,
+  "test_auc": 0.5358242266859814,
+  "winner_activation": "relu",
+  "relu_best_val_auc": 0.5339552263748606,
+  "tanh_best_val_auc": 0.5336686787391013,
+  "n_train": 13985,
+  "n_val": 2996,
+  "n_test": 2998,
+  "data_range_start": "2024-05-14 15:00:00",
+  "data_range_end": "2026-08-25 22:00:00"
+}
