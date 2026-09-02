@@ -5,6 +5,3 @@ __pycache__/
 data/raw/
 outputs/*.duckdb
 .pytest_cache/
-
-CLAUDE.md
-.claude/

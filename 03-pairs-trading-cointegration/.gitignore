@@ -3,6 +3,3 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .pytest_cache/
-
-CLAUDE.md
-.claude/

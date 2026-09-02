@@ -12,6 +12,3 @@ data/raw/*.csv
 # Historial de corridas del benchmark comparativo en DuckDB (se regenera con
 # db_persistence.py / compare_strategies.py, no hace falta versionarlo)
 outputs/backtest_history.duckdb
-
-CLAUDE.md
-.claude/
