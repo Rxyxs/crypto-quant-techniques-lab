@@ -24,6 +24,18 @@ completa entre ambos.
 datos de mercado de Binance, gratuito, público y sin autenticación. §9
 documenta la fuente con precisión.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Optimización media-varianza (Markowitz), SLSQP | `optimize_max_sharpe()`, `optimize_min_volatility()` |
+| Barrido de la frontera eficiente | `efficient_frontier()`, §7.3 |
+| Monte Carlo de portafolios aleatorios (chequeo visual) | `random_portfolios()` |
+| Estimación de retorno/covarianza anualizados (convención cripto 365 días) | `annualize_mean_returns()`, `annualize_covariance()` |
+| Persistencia de corridas en DuckDB | `results_store.py`, §7.6 |
+
+[**Gráfico interactivo**: frontera eficiente con los portafolios de máximo Sharpe / mínima volatilidad (pasa el mouse para ver la asignación)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/04-portfolio-markowitz-optimization/outputs/interactive/efficient_frontier_interactive.html)
+
 ---
 
 # 2. Impacto de Negocio e Indicadores Clave (KPIs)

@@ -21,6 +21,19 @@ impulsado por un generador de cambio de régimen conocido, de modo que los
 clusters descubiertos pueden contrastarse contra la verdad base, no solo
 observarse a ojo.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Simulación de retornos con cambio de régimen y verdad base conocida | `simulate_regime_path()`, `simulate_returns()` |
+| Features de correlación / dispersión / drawdown rodantes | `rolling_correlation_dispersion_drawdown()` |
+| Clustering KMeans + Gaussian Mixture, selección de k por silhouette | `select_k_by_silhouette()`, `main()` |
+| Etiquetado de régimen a partir de los centroides del cluster | `label_regimes()` |
+| Adjusted Rand Index vs. la verdad base del simulador | `main()`, §7 |
+| Persistencia en DuckDB del resumen de régimen + etiquetas diarias | `save_results_to_duckdb()` |
+
+[**Gráfico interactivo**: trayectoria de precio acumulada coloreada por régimen, según las asignaciones reales de KMeans](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/05-regime-detection-correlation/outputs/interactive/regime_colored_price.html)
+
 ---
 
 # 2. Impacto de Negocio e Indicadores Clave (KPIs)

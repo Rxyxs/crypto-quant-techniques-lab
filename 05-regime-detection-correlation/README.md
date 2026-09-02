@@ -19,6 +19,19 @@ simulated 8-asset panel (BTC, ETH, SOL, ADA, XRP, DOT, AVAX, MATIC) driven by
 a known regime-switching generator, so the discovered clusters can be
 checked against ground truth, not just eyeballed.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Regime-switching return simulation with known ground truth | `simulate_regime_path()`, `simulate_returns()` |
+| Rolling correlation / dispersion / drawdown features | `rolling_correlation_dispersion_drawdown()` |
+| KMeans + Gaussian Mixture clustering, silhouette-based k selection | `select_k_by_silhouette()`, `main()` |
+| Cluster-to-regime labeling from cluster centroids | `label_regimes()` |
+| Adjusted Rand Index vs. simulator ground truth | `main()`, §7 |
+| DuckDB persistence of regime summary + per-day labels | `save_results_to_duckdb()` |
+
+[**Interactive chart**: regime-colored cumulative price path from the actual KMeans cluster assignments](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/05-regime-detection-correlation/outputs/interactive/regime_colored_price.html)
+
 ---
 
 # 2. Business Impact & Key Performance Indicators

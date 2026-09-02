@@ -13,6 +13,18 @@
 ![Jupyter](https://img.shields.io/badge/Jupyter-notebook-F37626?style=flat&logo=jupyter&logoColor=white)
 ![Status](https://img.shields.io/badge/status-real%20Binance%20data-brightgreen?style=flat)
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| SMA crossover, RSI mean-reversion, momentum-sign signals | `technical_signals.py` |
+| Logistic Regression + LightGBM ML signals | `ml_models.py` |
+| Commission + volatility-scaled slippage friction model | `frictions.py` |
+| Gross vs. net Sharpe/drawdown/return backtest engine | `backtest_engine.py` |
+| Head-to-head 5-strategy benchmark, DuckDB history | `compare_strategies.py`, `db_persistence.py` |
+
+[**Interactive chart**: net-of-friction equity curves for all 5 strategies on the real 606-day test set](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/08-strategy-backtesting/outputs/interactive/equity_curves_comparison.html)
+
 ---
 
 ## Business Impact & Key Performance Indicators

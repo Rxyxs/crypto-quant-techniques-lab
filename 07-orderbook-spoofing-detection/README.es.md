@@ -25,6 +25,19 @@ un supuesto fijo de contaminación. Validado contra un order book simulado
 con **eventos de spoofing inyectados y conocidos**, de modo que el recall y
 la precisión reales del modelo se puedan medir en vez de asumirse.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Detección de anomalías con Isolation Forest sobre features de flujo L2 | `detect_spoofing.py` |
+| Baseline de z-score para comparación | `zscore_baseline.py` |
+| Puntuación por error de reconstrucción de autoencoder (PyTorch) | `autoencoder_spoofing.py` |
+| Puntuación en streaming walk-forward (sin fuga de información futura) | `02_L2_Orderbook_Streaming_Spoofing.ipynb` |
+| Calibración por presupuesto de alertas (vs. supuesto fijo de contaminación) | `alert_budget.py` |
+| Persistencia de métricas en DuckDB | `metrics_store.py` |
+
+[**Gráfico interactivo**: línea de tiempo de alertas de spoofing — score de anomalía por snapshot, eventos reales vs. alertas marcadas](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/07-orderbook-spoofing-detection/outputs/interactive/spoofing_alert_timeline.html)
+
 ---
 
 # 2. Motivación

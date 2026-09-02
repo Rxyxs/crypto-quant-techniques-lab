@@ -28,6 +28,20 @@ sobre precios diarios reales obtenidos de la API pública de Binance.
 > financiera. La §7 reporta un backtest perdedor honestamente en lugar de
 > ajustarlo hasta convertirlo en ganador.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Screening de cointegración en todo el universo de pares (Engle-Granger) | `screen_pairs_for_cointegration()` |
+| Hedge ratio OLS estático | `estimate_hedge_ratio()` |
+| Hedge ratio dinámico con filtro de Kalman | `kalman_pairs.py`, `02_Kalman_Dynamic_Hedge_Ratio.ipynb` |
+| Test de estacionariedad ADF sobre el spread | `adf_test()` |
+| Señal de entrada/salida por z-score rodante | `rolling_zscore()`, `generate_signals()` |
+| Backtest ajustado por costos de transacción | `backtest_spread_strategy()` |
+| Persistencia en DuckDB | `db_persistence.py` |
+
+[**Gráfico interactivo**: spread cointegrado BNBUSDT/XRPUSDT y z-score rodante con marcadores de entrada/salida](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/03-pairs-trading-cointegration/outputs/interactive/spread_zscore_interactive.html)
+
 ---
 
 # 2. Motivación

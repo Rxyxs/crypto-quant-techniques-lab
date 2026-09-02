@@ -24,6 +24,19 @@ a fixed contamination guess. Validated against a simulated order book with
 **known, injected spoofing events**, so the model's real recall and
 precision can be measured rather than assumed.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Isolation Forest anomaly detection over L2 order-flow features | `detect_spoofing.py` |
+| Z-score baseline for comparison | `zscore_baseline.py` |
+| Autoencoder reconstruction-error anomaly scoring (PyTorch) | `autoencoder_spoofing.py` |
+| Streaming, walk-forward (no look-ahead) scoring | `02_L2_Orderbook_Streaming_Spoofing.ipynb` |
+| Alert-budget calibration (fixed review budget vs. contamination guess) | `alert_budget.py` |
+| DuckDB metrics persistence | `metrics_store.py` |
+
+[**Interactive chart**: spoofing alert timeline — anomaly score per snapshot, true events vs. flagged alerts](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/07-orderbook-spoofing-detection/outputs/interactive/spoofing_alert_timeline.html)
+
 ---
 
 # 2. Motivation

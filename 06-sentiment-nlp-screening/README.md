@@ -22,6 +22,18 @@ sentiment model itself is not: every score in this repository is real
 FinBERT inference output, checked against the polarity each simulated
 headline was written to carry.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Pretrained FinBERT sentiment inference | `classify_sentiment()` |
+| TF-IDF + Logistic Regression / Random Forest baselines | `models_comparison.py` |
+| PyTorch MLP with activation comparison | `models_comparison.py`, §6 |
+| Sentiment-vs-volume aggregation, per-ticker ranking | `summarize_by_ticker()` |
+| DuckDB persistence of the model comparison | `outputs/model_comparison.duckdb` |
+
+[**Interactive chart**: FinBERT sentiment score vs. trading volume, colored by ticker (240 real inferences)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/06-sentiment-nlp-screening/outputs/interactive/sentiment_vs_volume.html)
+
 ---
 
 # 2. Business Impact & Key Performance Indicators

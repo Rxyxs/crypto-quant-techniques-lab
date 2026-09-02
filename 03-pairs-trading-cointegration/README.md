@@ -26,6 +26,20 @@ pulled from Binance's public API.
 > not financial advice. §7 reports a losing backtest honestly rather than
 > tuning it into a winning one.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Cointegration screening across the full pair universe (Engle-Granger) | `screen_pairs_for_cointegration()` |
+| Static OLS hedge ratio | `estimate_hedge_ratio()` |
+| Dynamic Kalman-filter hedge ratio | `kalman_pairs.py`, `02_Kalman_Dynamic_Hedge_Ratio.ipynb` |
+| ADF stationarity test on the spread | `adf_test()` |
+| Rolling z-score entry/exit signal generation | `rolling_zscore()`, `generate_signals()` |
+| Transaction-cost-adjusted backtest | `backtest_spread_strategy()` |
+| DuckDB persistence | `db_persistence.py` |
+
+[**Interactive chart**: BNBUSDT/XRPUSDT cointegrated spread and rolling z-score with entry/exit markers](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/03-pairs-trading-cointegration/outputs/interactive/spread_zscore_interactive.html)
+
 ---
 
 # 2. Motivation

@@ -23,6 +23,18 @@ sí no lo es: cada score en este repositorio es salida real de inferencia
 de FinBERT, contrastada contra la polaridad que cada titular simulado fue
 escrito para llevar.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Inferencia de sentimiento con FinBERT preentrenado | `classify_sentiment()` |
+| Baselines TF-IDF + Regresión Logística / Random Forest | `models_comparison.py` |
+| MLP en PyTorch con comparación de activaciones | `models_comparison.py`, §6 |
+| Agregación sentimiento-vs-volumen, ranking por activo | `summarize_by_ticker()` |
+| Persistencia en DuckDB de la comparación de modelos | `outputs/model_comparison.duckdb` |
+
+[**Gráfico interactivo**: score de sentimiento FinBERT vs. volumen de trading, coloreado por activo (240 inferencias reales)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/06-sentiment-nlp-screening/outputs/interactive/sentiment_vs_volume.html)
+
 ---
 
 # 2. Impacto de Negocio e Indicadores Clave (KPIs)

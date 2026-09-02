@@ -23,6 +23,18 @@ of real daily closing prices for `BTCUSDT`, `ETHUSDT`, `SOLUSDT`,
 no-authentication historical market-data archive. §8 documents the source
 precisely.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Mean-variance (Markowitz) optimization, SLSQP | `optimize_max_sharpe()`, `optimize_min_volatility()` |
+| Efficient frontier sweep | `efficient_frontier()`, §7.3 |
+| Random-portfolio Monte Carlo (visual sanity check) | `random_portfolios()` |
+| Annualized return/covariance estimation (365-day crypto convention) | `annualize_mean_returns()`, `annualize_covariance()` |
+| DuckDB run persistence | `results_store.py`, §7.6 |
+
+[**Interactive chart**: efficient frontier with max-Sharpe / min-volatility portfolios (hover for allocations)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/04-portfolio-markowitz-optimization/outputs/interactive/efficient_frontier_interactive.html)
+
 ---
 
 # 2. Business Impact & Key Performance Indicators

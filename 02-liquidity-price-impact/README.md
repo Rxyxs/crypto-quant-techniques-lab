@@ -32,6 +32,18 @@ executed trade, with the aggressor side) sourced directly from
 public, no-authentication historical market-data archive. Nothing here is
 synthetic or fabricated; §7 documents the source precisely.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Linear (Ridge) impact model | `baseline_impact.py`, §7.7 |
+| XGBoost with `TimeSeriesSplit` hyperparameter tuning | `xgboost_impact.py`, §3, §7.2 |
+| PyTorch MLP with custom Huber loss, activation comparison | `pytorch_impact.py`, §7.7 |
+| Multi-horizon signal-decay analysis (1 / 5 / 15 min) | §7.2 |
+| DuckDB persistence of all 3 models' metrics | `persist_metrics.py` |
+
+[**Interactive chart**: real BTCUSDT VWAP vs. order-book depth imbalance and trade-flow imbalance (1-min bins)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/02-liquidity-price-impact/outputs/interactive/price_vs_liquidity_imbalance.html)
+
 ---
 
 # 2. Business Impact & Key Performance Indicators

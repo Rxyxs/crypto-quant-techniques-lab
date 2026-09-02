@@ -38,6 +38,20 @@ that classification skill survive being turned into an actual trade."
 > resulting model is backtested as a production strategy, is a trading
 > signal, or constitutes financial advice.
 
+## Techniques used
+
+| Technique | Where |
+|---|---|
+| Dense NN (ReLU vs. Tanh), chronological split | `train_classifier.py`, §3.1, §3.3 |
+| Same pipeline replayed on real Binance data | `train_classifier_real.py`, §7.5 |
+| Conv1D + Multi-Head Self-Attention over rolling windows | `model_conv_attention.py`, §3.5 |
+| Walk-forward (rolling-origin) cross-validation | `train_walkforward.py`, §3.6 |
+| Volatility-scaled dead-zone 3-class labeling | `train_walkforward.build_multiclass_label()`, §3.4 |
+| Transaction-cost- and slippage-adjusted PnL | `train_walkforward.simulate_pnl()`, §3.6, §7.6 |
+| Logistic Regression + LightGBM baselines, DuckDB persistence | `train_baseline_ensemble.py`, §7.7 |
+
+[**Interactive chart**: gross vs. cost-adjusted walk-forward PnL curve (5 folds, 9,978 out-of-sample candles)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/01-direction-classification-deep-learning/outputs/interactive/walkforward_pnl_interactive.html)
+
 ---
 
 # 2. Motivation

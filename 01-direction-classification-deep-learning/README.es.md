@@ -41,6 +41,20 @@ sobrevive al convertirse en una operación real?".
 > estrategia de producción, es una señal de trading, ni constituye
 > asesoría financiera.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Red densa (ReLU vs. Tanh), split cronológico | `train_classifier.py`, §3.1, §3.3 |
+| Mismo pipeline replicado en datos reales de Binance | `train_classifier_real.py`, §7.5 |
+| Conv1D + Multi-Head Self-Attention sobre ventanas móviles | `model_conv_attention.py`, §3.5 |
+| Validación cruzada walk-forward (rolling-origin) | `train_walkforward.py`, §3.6 |
+| Etiquetado de 3 clases con zona muerta escalada por volatilidad | `train_walkforward.build_multiclass_label()`, §3.4 |
+| PnL ajustado por costos de transacción y slippage | `train_walkforward.simulate_pnl()`, §3.6, §7.6 |
+| Baselines de Regresión Logística + LightGBM, persistencia en DuckDB | `train_baseline_ensemble.py`, §7.7 |
+
+[**Gráfico interactivo**: curva de PnL walk-forward bruto vs. neto de costos (5 folds, 9,978 velas out-of-sample)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/01-direction-classification-deep-learning/outputs/interactive/walkforward_pnl_interactive.html)
+
 ---
 
 # 2. Motivación

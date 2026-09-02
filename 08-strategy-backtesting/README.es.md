@@ -13,6 +13,18 @@
 ![Jupyter](https://img.shields.io/badge/Jupyter-notebook-F37626?style=flat&logo=jupyter&logoColor=white)
 ![Status](https://img.shields.io/badge/status-real%20Binance%20data-brightgreen?style=flat)
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Señales de cruce de SMA, reversión a la media con RSI, signo del momentum | `technical_signals.py` |
+| Señales de ML: Regresión Logística + LightGBM | `ml_models.py` |
+| Modelo de fricciones: comisión + slippage escalado por volatilidad | `frictions.py` |
+| Motor de backtest con Sharpe/drawdown/retorno bruto vs. neto | `backtest_engine.py` |
+| Benchmark cabeza a cabeza de 5 estrategias, historial en DuckDB | `compare_strategies.py`, `db_persistence.py` |
+
+[**Gráfico interactivo**: curvas de equity netas de fricción para las 5 estrategias en el set de test real de 606 días](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/08-strategy-backtesting/outputs/interactive/equity_curves_comparison.html)
+
 ---
 
 ## Impacto de Negocio e Indicadores Clave (KPIs)

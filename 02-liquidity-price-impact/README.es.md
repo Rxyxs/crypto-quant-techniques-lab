@@ -32,6 +32,18 @@ de [Binance Vision](https://data.binance.vision) — el archivo histórico de
 datos de mercado de Binance, gratuito, público y sin autenticación. Nada
 aquí es sintético ni fabricado; §9 documenta la fuente con precisión.
 
+## Técnicas usadas
+
+| Técnica | Dónde |
+|---|---|
+| Modelo de impacto lineal (Ridge) | `baseline_impact.py`, §7.7 |
+| XGBoost con ajuste de hiperparámetros `TimeSeriesSplit` | `xgboost_impact.py`, §3, §7.2 |
+| MLP en PyTorch con loss Huber custom, comparación de activaciones | `pytorch_impact.py`, §7.7 |
+| Análisis de decaimiento de señal multi-horizonte (1 / 5 / 15 min) | §7.2 |
+| Persistencia en DuckDB de las métricas de los 3 modelos | `persist_metrics.py` |
+
+[**Gráfico interactivo**: VWAP real de BTCUSDT vs. desbalance de profundidad del order book y flujo de trades (bins de 1 min)](https://htmlpreview.github.io/?https://github.com/Rxyxs/crypto-quant-techniques-lab/blob/main/02-liquidity-price-impact/outputs/interactive/price_vs_liquidity_imbalance.html)
+
 ---
 
 # 2. Impacto de Negocio e Indicadores Clave (KPIs)
