@@ -55,4 +55,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run test suite
-        run: pytest tests/ -v
+        # `pytest` a secas no agrega la raiz de cada tecnica a sys.path (solo
+        # algunas carpetas se salvan con su propio conftest.py/pytest.ini);
+        # `python -m pytest` si lo hace, de forma universal, sin depender de
+        # que cada tecnica tenga su propio arreglo.
+        run: python -m pytest tests/ -v
