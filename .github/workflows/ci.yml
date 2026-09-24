@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  pytest:
+    name: ${{ matrix.folder }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Las ocho tecnicas del lab, menos 06-sentiment-nlp-screening (no
+        # tiene carpeta tests/ todavia -- nada que este job pudiera correr).
+        folder:
+          - 01-direction-classification-deep-learning
+          - 02-liquidity-price-impact
+          - 03-pairs-trading-cointegration
+          - 04-portfolio-markowitz-optimization
+          - 05-regime-detection-correlation
+          - 07-orderbook-spoofing-detection
+          - 08-strategy-backtesting
+    defaults:
+      run:
+        working-directory: ${{ matrix.folder }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.folder }}-${{ hashFiles(format('{0}/requirements.txt', matrix.folder)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.folder }}-
+
+      - name: Install CPU PyTorch when the folder needs it
+        run: |
+          if grep -qiE '^torch([><=~ ]|$)' requirements.txt; then
+            python -m pip install --upgrade pip
+            pip install torch --index-url https://download.pytorch.org/whl/cpu
+          fi
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        run: pytest tests/ -v
