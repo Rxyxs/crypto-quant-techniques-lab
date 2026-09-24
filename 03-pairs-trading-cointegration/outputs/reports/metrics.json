@@ -1,22 +1,25 @@
 {
-  "pair": "BNBUSDT/XRPUSDT",
+  "pair": "BTCUSDT/XRPUSDT",
   "n_days": 1000,
   "date_range": [
-    "2023-12-02",
-    "2026-08-27"
+    "2023-12-30",
+    "2026-09-24"
   ],
-  "engle_granger_pvalue": 0.029923199369745704,
-  "cointegrated_5pct": true,
-  "hedge_ratio_beta": 0.3006790408205946,
-  "hedge_ratio_alpha": 6.360517729624564,
-  "hedge_ratio_r_squared": 0.44306500195990006,
-  "adf_pvalue": 0.007273536804125938,
+  "engle_granger_pvalue": 0.1091439332766232,
+  "cointegrated_5pct": false,
+  "hedge_ratio_beta": 0.34553683723139395,
+  "hedge_ratio_alpha": 11.181442473393822,
+  "hedge_ratio_r_squared": 0.7596818791081712,
+  "kalman_beta_mean": 0.42611977411973134,
+  "kalman_beta_final": 0.5501587992703039,
+  "adf_pvalue": 0.00025584061354372046,
   "spread_stationary_5pct": true,
-  "total_return": -0.43728315393904793,
-  "total_return_gross": -0.37189189679526724,
-  "total_transaction_cost": 0.11099999999999999,
-  "annualized_sharpe": -0.3731825754762117,
-  "max_drawdown": -0.5164194287336368,
-  "n_trades": 21,
-  "win_rate": 0.5075
+  "total_return": 0.049541531361674274,
+  "total_return_gross": 0.10122330743761276,
+  "total_transaction_cost": 0.048600000000000004,
+  "annualized_sharpe": 0.2299159678100027,
+  "annualized_sortino": 0.41107929187364517,
+  "max_drawdown": -0.10218996885367071,
+  "n_trades": 9,
+  "win_rate": 0.48
 }

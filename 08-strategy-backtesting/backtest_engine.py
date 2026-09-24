@@ -122,6 +122,31 @@ def run_backtest(test_df: pd.DataFrame, signal: np.ndarray) -> pd.DataFrame:
     return out
 
 
+def sortino_ratio(
+    returns: pd.Series, mar: float = 0.0, periods_per_year: int = PERIODS_PER_YEAR,
+) -> float:
+    """Sortino anualizado: como Sharpe, pero normaliza solo por la volatilidad
+    *a la baja* (desviacion respecto al minimum acceptable return `mar`), no
+    por la desviacion estandar completa -- dias buenos extraordinarios no
+    deberian penalizar el ratio igual que dias malos.
+
+    downside_deviation = raiz( promedio( min(retorno - mar, 0)^2 ) ) sobre
+    TODOS los dias (un dia sin caida aporta 0 al promedio, la definicion
+    estandar de Sortino & Van der Meer 1991 -- no la desviacion estandar del
+    subconjunto negativo solamente).
+
+    Si ningun dia cayo por debajo de `mar`, downside_deviation es 0 y el
+    ratio queda indefinido: se devuelve NaN en vez de dividir por cero o
+    devolver un 0.0 que se leeria como "sin retorno ajustado por riesgo"
+    cuando en realidad podria ser cualquier cosa.
+    """
+    shortfall = np.minimum(returns - mar, 0.0)
+    downside_deviation = float(np.sqrt((shortfall**2).mean()))
+    if downside_deviation == 0.0:
+        return float("nan")
+    return float((returns.mean() - mar) / downside_deviation * np.sqrt(periods_per_year))
+
+
 def compute_metrics(
     bt: pd.DataFrame,
     return_col: str = "strategy_return",
@@ -134,6 +159,7 @@ def compute_metrics(
         if strat_returns.std() > 0
         else 0.0
     )
+    sortino = sortino_ratio(strat_returns)
     trades = bt[bt["signal"] == 1]
     win_rate = (trades[return_col] > 0).mean() if len(trades) > 0 else 0.0
     max_drawdown = bt[drawdown_col].min()
@@ -142,6 +168,7 @@ def compute_metrics(
 
     return {
         "Sharpe Ratio (annualized)": round(float(sharpe), 3),
+        "Sortino Ratio (annualized)": round(float(sortino), 3) if np.isfinite(sortino) else float("nan"),
         "Win Rate": round(float(win_rate), 3),
         "Max Drawdown": round(float(max_drawdown), 3),
         "Total Return": round(float(total_return), 3),
@@ -204,6 +231,8 @@ def render_dashboard(
     rows = [
         ["Sharpe (gross)", f"{metrics_gross['Sharpe Ratio (annualized)']}"],
         ["Sharpe (net)", f"{metrics_net['Sharpe Ratio (annualized)']}"],
+        ["Sortino (gross)", f"{metrics_gross['Sortino Ratio (annualized)']}"],
+        ["Sortino (net)", f"{metrics_net['Sortino Ratio (annualized)']}"],
         ["Max Drawdown (gross)", f"{metrics_gross['Max Drawdown']:.1%}"],
         ["Max Drawdown (net)", f"{metrics_net['Max Drawdown']:.1%}"],
         ["Total Return (gross)", f"{metrics_gross['Total Return']:.1%}"],

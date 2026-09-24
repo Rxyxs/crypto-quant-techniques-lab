@@ -18,6 +18,7 @@ from pairs_trading_engine import (
     generate_signals,
     rolling_zscore,
     screen_pairs_for_cointegration,
+    sortino_ratio,
 )
 
 N = 500
@@ -183,6 +184,54 @@ class TestBacktest:
         result = backtest_spread_strategy(y, x, beta_series, positions)
         assert isinstance(result.total_return, float)
         assert len(result.equity_curve) == 20
+
+
+class TestSortino:
+    def test_sortino_reproduce_la_formula_a_mano(self):
+        returns = pd.Series([0.02, -0.01, 0.03, -0.02, 0.01])
+        # downside_deviation = sqrt(mean([0, 0.0001, 0, 0.0004, 0])) = 0.01
+        # sortino = mean(returns) / 0.01 * sqrt(365)
+        esperado = returns.mean() / 0.01 * np.sqrt(365)
+        assert sortino_ratio(returns) == pytest.approx(esperado, rel=1e-9)
+
+    def test_sortino_es_nan_sin_ningun_retorno_bajo_el_mar(self):
+        """Sin observaciones por debajo del minimum acceptable return, la
+        desviacion a la baja es 0 -- el ratio queda indefinido (NaN), no un
+        0.0 que se leeria como "sin retorno ajustado por riesgo", ni una
+        ZeroDivisionError."""
+        returns = pd.Series([0.01, 0.02, 0.005, 0.03])
+        assert np.isnan(sortino_ratio(returns))
+
+    def test_sortino_es_nan_con_retornos_todos_cero(self):
+        returns = pd.Series([0.0, 0.0, 0.0])
+        assert np.isnan(sortino_ratio(returns))
+
+    def test_sortino_ignora_la_dispersion_al_alza_que_sharpe_si_penaliza(self):
+        """Dos series con exactamente la misma caida y la misma media, pero
+        distinta dispersion al alza (0.02+0.02 contra 0.01+0.03, misma suma):
+        Sharpe las distingue -- la varianza total difiere -- pero Sortino
+        tiene que dar exactamente el mismo numero en las dos, porque
+        downside_deviation solo mira los dias por debajo del mar."""
+        base_caida = [-0.01, -0.01]
+        moderada = pd.Series(base_caida + [0.02, 0.02])
+        volatil_al_alza = pd.Series(base_caida + [0.01, 0.03])  # misma suma, mas dispersa
+
+        sharpe_moderada = moderada.mean() / moderada.std()
+        sharpe_volatil = volatil_al_alza.mean() / volatil_al_alza.std()
+        assert sharpe_moderada != pytest.approx(sharpe_volatil, rel=1e-6), (
+            "el fixture no esta armado como se pretende si Sharpe no las distingue"
+        )
+
+        assert sortino_ratio(moderada) == pytest.approx(sortino_ratio(volatil_al_alza), rel=1e-9)
+
+    def test_backtest_result_trae_sortino_finito_con_retornos_mixtos(self):
+        y, x = _cointegrated_pair()
+        hedge = estimate_hedge_ratio(y, x)
+        spread = compute_spread(y, x, hedge)
+        z = rolling_zscore(spread)
+        positions = generate_signals(z)
+        result = backtest_spread_strategy(y, x, hedge.beta, positions)
+        assert np.isfinite(result.annualized_sortino)
 
 
 class TestScreening:

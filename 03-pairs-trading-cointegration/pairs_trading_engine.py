@@ -37,6 +37,8 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller, coint
 
+from kalman_pairs import run_kalman_hedge_ratio
+
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 INTERVAL = "1d"
 N_CANDLES = 1000  # maximo de velas diarias en una sola llamada a la API (~2.7 anos)
@@ -226,6 +228,32 @@ def compute_transaction_cost_returns(
     return cost.rename("transaction_cost")
 
 
+def sortino_ratio(
+    returns: pd.Series, mar: float = 0.0, periods_per_year: int = 365,
+) -> float:
+    """Sortino anualizado: como Sharpe, pero normaliza solo por la volatilidad
+    *a la baja* (desviacion respecto al minimum acceptable return `mar`, no la
+    desviacion estandar completa) -- un dia bueno extraordinario no deberia
+    penalizar el ratio de la misma forma que uno malo.
+
+    downside_deviation = raiz( promedio( min(retorno - mar, 0)^2 ) ), sobre
+    TODOS los dias (no solo los negativos): un dia sin caida aporta 0 al
+    promedio, que es la definicion estandar (Sortino & Van der Meer, 1991),
+    distinta de calcular la desviacion estandar solo del subconjunto negativo.
+
+    Si no hubo ningun dia por debajo de `mar` en toda la muestra,
+    downside_deviation es 0 y el ratio queda indefinido (no hay evidencia de
+    riesgo a la baja con la que normalizar) -- se devuelve NaN en vez de
+    dividir por cero o inventar un 0.0 que se leeria como "sin retorno
+    ajustado por riesgo" cuando en realidad podria ser cualquier cosa.
+    """
+    shortfall = np.minimum(returns - mar, 0.0)
+    downside_deviation = float(np.sqrt((shortfall**2).mean()))
+    if downside_deviation == 0.0:
+        return float("nan")
+    return float((returns.mean() - mar) / downside_deviation * np.sqrt(periods_per_year))
+
+
 @dataclass
 class BacktestResult:
     equity_curve: pd.Series
@@ -234,6 +262,7 @@ class BacktestResult:
     total_return: float
     total_return_gross: float
     annualized_sharpe: float
+    annualized_sortino: float
     max_drawdown: float
     n_trades: int
     win_rate: float
@@ -276,6 +305,7 @@ def backtest_spread_strategy(
     daily_mean = strategy_returns.mean()
     daily_std = strategy_returns.std()
     annualized_sharpe = float((daily_mean / daily_std) * np.sqrt(365)) if daily_std > 0 else 0.0
+    annualized_sortino = sortino_ratio(strategy_returns)
 
     running_max = equity_curve.cummax()
     drawdown = equity_curve / running_max - 1
@@ -296,6 +326,7 @@ def backtest_spread_strategy(
         total_return=total_return,
         total_return_gross=total_return_gross,
         annualized_sharpe=annualized_sharpe,
+        annualized_sortino=annualized_sortino,
         max_drawdown=max_drawdown,
         n_trades=n_trades,
         win_rate=win_rate,
@@ -376,21 +407,36 @@ def run_full_pipeline(y_symbol: str | None = None, x_symbol: str | None = None) 
     print(f"  estadistico={eg_result.test_statistic:.3f}  p-value={eg_result.p_value:.4f}  "
           f"cointegrados al 5%: {eg_result.is_cointegrated_5pct}")
 
-    hedge = estimate_hedge_ratio(log_y, log_x)
-    print(f"\nHedge ratio (OLS): beta={hedge.beta:.4f}  alpha={hedge.alpha:.4f}  R2={hedge.r_squared:.3f}")
+    # Hedge ratio OLS estatico: se reporta como referencia -- muestra lo que
+    # daria el enfoque "clasico" de libro de texto -- pero NO alimenta el
+    # backtest de abajo. Ajustado una sola vez sobre TODA la muestra, un
+    # trader en el dia 1 nunca habria podido conocer este numero (depende de
+    # precios de dias que todavia no existian). Dia 18 lo encontro y lo probo
+    # con `test_hedge_ratio_estatico_NO_es_invariante_por_truncamiento_hallazgo_dia_18`;
+    # Dia 19 lo saca del camino que determina retornos.
+    hedge_estatico = estimate_hedge_ratio(log_y, log_x)
+    print(f"\nHedge ratio OLS estatico (referencia, NO usado para el backtest): "
+          f"beta={hedge_estatico.beta:.4f}  alpha={hedge_estatico.alpha:.4f}  R2={hedge_estatico.r_squared:.3f}")
 
-    spread = compute_spread(log_y, log_x, hedge)
-    adf_result = adf_test(spread)
-    print(f"\nADF test sobre el spread: estadistico={adf_result.adf_statistic:.3f}  "
+    # Hedge ratio dinamico via Filtro de Kalman: beta_t se re-estima cada dia
+    # usando solo datos hasta t (recursion hacia adelante, ver kalman_pairs.py).
+    # Es lo que efectivamente alimenta la señal y el backtest -- verificado
+    # invariante por truncamiento en test_lookahead_audit.py.
+    kalman = run_kalman_hedge_ratio(log_y, log_x)
+    print(f"Hedge ratio Kalman (dinamico, este es el que se usa): "
+          f"beta medio={kalman.beta.mean():.4f}  beta final={kalman.beta.iloc[-1]:.4f}")
+
+    adf_result = adf_test(kalman.spread)
+    print(f"\nADF test sobre el spread de Kalman: estadistico={adf_result.adf_statistic:.3f}  "
           f"p-value={adf_result.p_value:.4f}  estacionario al 5%: {adf_result.is_stationary_5pct}")
 
-    zscore = rolling_zscore(spread)
-    positions = generate_signals(zscore)
-    backtest = backtest_spread_strategy(panel[y_symbol], panel[x_symbol], hedge.beta, positions)
+    positions = generate_signals(kalman.zscore)
+    backtest = backtest_spread_strategy(panel[y_symbol], panel[x_symbol], kalman.beta, positions)
 
-    print(f"\nBacktest ({ENTRY_Z=}, {EXIT_Z=}, ventana z-score={ROLLING_ZSCORE_WINDOW}d):")
+    print(f"\nBacktest ({ENTRY_Z=}, {EXIT_Z=}, z-score natural del Kalman, sin ventana rolling arbitraria):")
     print(f"  retorno total (neto de costos): {backtest.total_return:.1%}  (bruto: {backtest.total_return_gross:.1%})")
     print(f"  Sharpe anualizado: {backtest.annualized_sharpe:.2f}")
+    print(f"  Sortino anualizado: {backtest.annualized_sortino:.2f}")
     print(f"  max drawdown: {backtest.max_drawdown:.1%}")
     print(f"  trades: {backtest.n_trades}  win rate: {backtest.win_rate:.1%}")
     print(f"  costo total de transaccion: {backtest.total_transaction_cost:.2%} acumulado")
@@ -401,15 +447,25 @@ def run_full_pipeline(y_symbol: str | None = None, x_symbol: str | None = None) 
         "date_range": [str(panel.index.min().date()), str(panel.index.max().date())],
         "engle_granger_pvalue": eg_result.p_value,
         "cointegrated_5pct": eg_result.is_cointegrated_5pct,
-        "hedge_ratio_beta": hedge.beta,
-        "hedge_ratio_alpha": hedge.alpha,
-        "hedge_ratio_r_squared": hedge.r_squared,
+        # Hedge ratio OLS estatico: referencia de comparacion (ver el print de
+        # arriba), NO lo que determino total_return/sharpe/etc. de abajo --
+        # se mantiene con este nombre por compatibilidad con el esquema fijo
+        # de db_persistence.py (backtest_runs.hedge_ratio_beta).
+        "hedge_ratio_beta": hedge_estatico.beta,
+        "hedge_ratio_alpha": hedge_estatico.alpha,
+        "hedge_ratio_r_squared": hedge_estatico.r_squared,
+        # Hedge ratio Kalman: el que SI alimento el backtest. Nuevo en el
+        # Dia 19, no forma parte todavia del esquema DuckDB (persist_metrics
+        # ignora claves que no reconoce, asi que agregarlas aca es seguro).
+        "kalman_beta_mean": float(kalman.beta.mean()),
+        "kalman_beta_final": float(kalman.beta.iloc[-1]),
         "adf_pvalue": adf_result.p_value,
         "spread_stationary_5pct": adf_result.is_stationary_5pct,
         "total_return": backtest.total_return,
         "total_return_gross": backtest.total_return_gross,
         "total_transaction_cost": backtest.total_transaction_cost,
         "annualized_sharpe": backtest.annualized_sharpe,
+        "annualized_sortino": backtest.annualized_sortino,
         "max_drawdown": backtest.max_drawdown,
         "n_trades": backtest.n_trades,
         "win_rate": backtest.win_rate,
