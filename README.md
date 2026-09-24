@@ -8,16 +8,16 @@ A single lab, eight standalone techniques applied to crypto market data — sign
 
 ## Techniques
 
-| # | Technique | Folder | What it does |
-|---|---|---|---|
-| 01 | Direction classification (deep learning) | [`01-direction-classification-deep-learning`](01-direction-classification-deep-learning) | Dense neural nets (ReLU vs. Tanh) classify next-candle direction on simulated AR(1)/GARCH OHLCV data and real Binance data. |
-| 02 | Liquidity & price impact | [`02-liquidity-price-impact`](02-liquidity-price-impact) | XGBoost model of order-book price impact from synthetic depth/imbalance features. |
-| 03 | Pairs trading (cointegration) | [`03-pairs-trading-cointegration`](03-pairs-trading-cointegration) | Statistical cointegration screening + Kalman-filtered dynamic hedge ratio for pairs trading. |
-| 04 | Portfolio optimization (Markowitz) | [`04-portfolio-markowitz-optimization`](04-portfolio-markowitz-optimization) | Efficient-frontier portfolio construction across a crypto asset universe. |
-| 05 | Regime detection & correlation | [`05-regime-detection-correlation`](05-regime-detection-correlation) | Markov regime-switching detection and its effect on cross-asset correlation. |
-| 06 | Sentiment screening (NLP) | [`06-sentiment-nlp-screening`](06-sentiment-nlp-screening) | FinBERT sentiment on financial headlines vs. trading volume. |
-| 07 | Order-book spoofing detection | [`07-orderbook-spoofing-detection`](07-orderbook-spoofing-detection) | Isolation Forest + autoencoder over streaming L2 order-book data, with alert-budget calibration. |
-| 08 | Strategy backtesting | [`08-strategy-backtesting`](08-strategy-backtesting) | Statistical backtesting engine comparing trading signals under realistic frictions. |
+| # | Technique | Folder | What it does | Entry point |
+|---|---|---|---|---|
+| 01 | Direction classification (deep learning) | [`01-direction-classification-deep-learning`](01-direction-classification-deep-learning) | Dense neural nets (ReLU vs. Tanh) classify next-candle direction on simulated AR(1)/GARCH OHLCV data and real Binance data. | `python train_classifier.py` |
+| 02 | Liquidity & price impact | [`02-liquidity-price-impact`](02-liquidity-price-impact) | XGBoost model of order-book price impact from synthetic depth/imbalance features. | `python xgboost_impact.py` |
+| 03 | Pairs trading (cointegration) | [`03-pairs-trading-cointegration`](03-pairs-trading-cointegration) | Statistical cointegration screening + Kalman-filtered dynamic hedge ratio for pairs trading. | `python pairs_trading_engine.py` |
+| 04 | Portfolio optimization (Markowitz) | [`04-portfolio-markowitz-optimization`](04-portfolio-markowitz-optimization) | Efficient-frontier portfolio construction across a crypto asset universe. | notebook-driven — `portfolio_optimizer.py` is imported, not run standalone; see the folder's README |
+| 05 | Regime detection & correlation | [`05-regime-detection-correlation`](05-regime-detection-correlation) | Markov regime-switching detection and its effect on cross-asset correlation. | `python market_analysis.py` |
+| 06 | Sentiment screening (NLP) | [`06-sentiment-nlp-screening`](06-sentiment-nlp-screening) | FinBERT sentiment on financial headlines vs. trading volume. | `python sentiment_screener.py` |
+| 07 | Order-book spoofing detection | [`07-orderbook-spoofing-detection`](07-orderbook-spoofing-detection) | Isolation Forest + autoencoder over streaming L2 order-book data, with alert-budget calibration. | `python detect_spoofing.py` |
+| 08 | Strategy backtesting | [`08-strategy-backtesting`](08-strategy-backtesting) | Statistical backtesting engine comparing trading signals under realistic frictions. | `python backtest_engine.py` |
 
 ## Methodology: temporal integrity, risk-adjusted metrics, and frictions
 
@@ -54,10 +54,10 @@ Each folder is self-contained:
 cd 0N-technique-name
 python -m venv venv
 venv/Scripts/pip install -r requirements.txt   # Windows
-python <entry_point>.py
+python <entry_point>.py                        # exact command per technique in the table above
 ```
 
-See the folder's own README for the exact entry point, real results from an actual run, and any honest negative findings.
+See the folder's own README for real results from an actual run and any honest negative findings.
 
 ## Continuous integration
 
