@@ -411,9 +411,9 @@ def run_full_pipeline(y_symbol: str | None = None, x_symbol: str | None = None) 
     # daria el enfoque "clasico" de libro de texto -- pero NO alimenta el
     # backtest de abajo. Ajustado una sola vez sobre TODA la muestra, un
     # trader en el dia 1 nunca habria podido conocer este numero (depende de
-    # precios de dias que todavia no existian). Dia 18 lo encontro y lo probo
-    # con `test_hedge_ratio_estatico_NO_es_invariante_por_truncamiento_hallazgo_dia_18`;
-    # Dia 19 lo saca del camino que determina retornos.
+    # precios de dias que todavia no existian). Lo encontre y lo probe
+    # con `test_hedge_ratio_estatico_no_es_invariante_por_truncamiento`;
+    # despues lo saque del camino que determina retornos.
     hedge_estatico = estimate_hedge_ratio(log_y, log_x)
     print(f"\nHedge ratio OLS estatico (referencia, NO usado para el backtest): "
           f"beta={hedge_estatico.beta:.4f}  alpha={hedge_estatico.alpha:.4f}  R2={hedge_estatico.r_squared:.3f}")
@@ -454,9 +454,9 @@ def run_full_pipeline(y_symbol: str | None = None, x_symbol: str | None = None) 
         "hedge_ratio_beta": hedge_estatico.beta,
         "hedge_ratio_alpha": hedge_estatico.alpha,
         "hedge_ratio_r_squared": hedge_estatico.r_squared,
-        # Hedge ratio Kalman: el que SI alimento el backtest. Nuevo en el
-        # Dia 19, no forma parte todavia del esquema DuckDB (persist_metrics
-        # ignora claves que no reconoce, asi que agregarlas aca es seguro).
+        # Hedge ratio Kalman: el que SI alimento el backtest. Todavia no
+        # forma parte del esquema DuckDB (persist_metrics ignora claves que
+        # no reconoce, asi que agregarlas aca es seguro).
         "kalman_beta_mean": float(kalman.beta.mean()),
         "kalman_beta_final": float(kalman.beta.iloc[-1]),
         "adf_pvalue": adf_result.p_value,

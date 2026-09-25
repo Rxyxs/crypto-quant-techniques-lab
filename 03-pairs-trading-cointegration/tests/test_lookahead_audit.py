@@ -4,7 +4,7 @@ datos futuros después de t" (invariancia por truncamiento).
 
 Historia de este archivo:
 
-- **Día 18** encontró y probó el hallazgo: `run_full_pipeline` llamaba
+- Encontré y probé el hallazgo: `run_full_pipeline` llamaba
   `estimate_hedge_ratio` UNA sola vez sobre el panel completo y reusaba ese
   beta para puntuar la serie entera, incluidos los primeros días -- que en
   la práctica ocurrieron antes de que existieran los datos con los que se
@@ -12,13 +12,13 @@ Historia de este archivo:
   números sobre las funciones en sí (`estimate_hedge_ratio` + `compute_spread`
   siguen sin ser invariantes por truncamiento si se usan así, por diseño --
   un OLS de muestra completa no puede serlo).
-- **Día 19** corrigió `run_full_pipeline` para que la señal real -- la que
+- Corregí `run_full_pipeline` para que la señal real -- la que
   efectivamente entra al backtest -- use el hedge ratio dinámico del filtro
   de Kalman en vez del OLS estático. `test_pipeline_de_kalman_produce_
   posiciones_invariantes_por_truncamiento` prueba la ruta que el pipeline
   usa hoy, de punta a punta (beta -> zscore -> posición).
 
-El test del Día 18 se mantiene tal cual: sigue siendo verdad sobre esas dos
+El primer test se mantiene tal cual: sigue siendo verdad sobre esas dos
 funciones usadas de esa forma, y es la evidencia de por qué el pipeline dejó
 de usarlas así.
 """
@@ -85,8 +85,8 @@ def test_kalman_hedge_ratio_es_invariante_por_truncamiento():
 
 # ------------------------------------------------- la pieza que SÍ filtra
 
-def test_hedge_ratio_estatico_NO_es_invariante_por_truncamiento_hallazgo_dia_18():
-    """Hallazgo del Día 18, no una aspiración: `run_full_pipeline` llama
+def test_hedge_ratio_estatico_no_es_invariante_por_truncamiento():
+    """Esto es un hallazgo, no una aspiración: `run_full_pipeline` llama
     `estimate_hedge_ratio(log_y, log_x)` UNA sola vez sobre el panel de
     precios completo, y usa ese mismo beta para construir el spread (y por
     lo tanto la señal) de la serie ENTERA -- incluidos los primeros días del
@@ -119,11 +119,11 @@ def test_hedge_ratio_estatico_NO_es_invariante_por_truncamiento_hallazgo_dia_18(
     )
 
 
-# ------------------------------------- Día 19: la ruta que el pipeline usa hoy
+# ------------------------------------- la ruta que el pipeline usa hoy
 
 def test_pipeline_de_kalman_produce_posiciones_invariantes_por_truncamiento():
     """Prueba de punta a punta sobre exactamente lo que `run_full_pipeline`
-    corre desde el Día 19: `run_kalman_hedge_ratio` -> `generate_signals`.
+    corre hoy: `run_kalman_hedge_ratio` -> `generate_signals`.
     `generate_signals` es un loop hacia adelante con estado (mantiene la
     posición previa entre bandas de entrada/salida) -- esta prueba confirma
     que ese estado tampoco introduce dependencia del futuro: la posición del

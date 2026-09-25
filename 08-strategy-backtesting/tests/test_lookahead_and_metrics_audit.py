@@ -1,4 +1,4 @@
-"""Día 18 -- dos cosas que test_backtest_engine.py no cubría:
+"""Dos cosas que test_backtest_engine.py no cubría:
 
 1. Invariancia por truncamiento de `build_features_and_labels`: el criterio
    verificable de "sin look-ahead" (agregar filas futuras al final de la
@@ -9,7 +9,7 @@
    returns_expected_keys`) solo comprueba que las claves del dict existen,
    nunca que los números sean correctos.
 
-Día 19 agregó lo que el Día 18 encontró que faltaba: `sortino_ratio` en
+Después agregué lo que encontré que faltaba: `sortino_ratio` en
 `backtest_engine.py`, con sus propios tests al final de este archivo.
 """
 from __future__ import annotations
@@ -142,7 +142,7 @@ def test_total_return_es_el_ultimo_valor_de_la_equity_curve_menos_uno():
     assert metrics["Total Return"] == pytest.approx(esperado, abs=1e-9)
 
 
-# --------------------------------------------------------- Día 19: Sortino
+# --------------------------------------------------------- Sortino
 
 def test_sortino_reproduce_la_formula_a_mano():
     returns = pd.Series([0.02, -0.01, 0.03, -0.02, 0.01])
