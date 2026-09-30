@@ -40,7 +40,7 @@ observarse a ojo.
 
 | Métrica | Resultado | Qué significa |
 |---|---|---|
-| Correlación promedio por pares, régimen calmo vs. turbulento | 0,29 vs. **0,56** | El beneficio de diversificación casi se reduce a la mitad exactamente cuando más se necesita -- oculto por una única matriz de correlación estática |
+| Correlación promedio por pares, régimen calmo vs. turbulento | 0,29 vs. **0,56** (feature de ventana rodante) — 0,42 vs. **0,58** agrupada por régimen | El beneficio de diversificación se degrada exactamente cuando más se necesita, con cualquiera de las dos medidas — ver §6.3 para por qué difieren y cuál muestra el heatmap |
 | Selección del número de regímenes | k=2 (elegido por silhouette), no los 4 regímenes "reales" del simulador | Hallazgo honesto: k=2 igual recupera claramente el hecho estilizado calmo-vs-turbulento, aunque no recupera cada régimen inyectado (Adjusted Rand Index 0,158) |
 | Formato de salida | `outputs/regime_summary.csv` legible por máquina | Alimenta directamente una regla de position-sizing o cobertura, no solo un gráfico |
 
@@ -200,12 +200,27 @@ posiblemente más accionable, entre **calmo y turbulento**.
 
 ![Heatmap de correlacion por regimen](outputs/correlation_heatmap_by_regime.png)
 
-Este es el hallazgo de negocio central: la correlación promedio par-a-par
-casi se **duplica**, de 0,29 a 0,56, entre el régimen calmo y el
-turbulento. La correlación de cada par de activos aumenta en el régimen
-turbulento — el efecto de ruptura de correlación que el simulador fue
-construido deliberadamente para reproducir, y el mecanismo detrás del
-punto de colapso de diversificación de la §2.
+Este es el hallazgo de negocio central: **todos y cada uno de los pares de
+activos se vuelven más correlacionados en el régimen turbulento** — el efecto
+de ruptura de correlación que el simulador fue construido deliberadamente para
+reproducir, y el mecanismo detrás del punto de colapso de diversificación de
+la §2.
+
+**Dos estadísticos distintos, y la diferencia importa.** El heatmap de arriba
+agrupa todos los días asignados a cada régimen y calcula una matriz de
+correlación por régimen (`np.corrcoef` en `plot_correlation_heatmap_by_regime`).
+Su promedio fuera de la diagonal pasa de **0,419 (calmo) a 0,576 (turbulento)
+— un aumento de 1,37x**. La columna `avg_pairwise_corr_mean` de la tabla de
+§6.2 es otra cantidad: el promedio de la correlación par-a-par de *ventana
+rodante* usada como feature del clustering, promediada sobre los días de cada
+régimen, y pasa de **0,294 a 0,559 — 1,90x, cerca de duplicarse**.
+
+Ambos son correctos y sostienen la misma conclusión, pero no son
+intercambiables. Citar la cifra rodante junto al heatmap agrupado
+tergiversaría lo que la figura muestra. El estadístico rodante se mueve más
+porque una ventana corta dentro de un tramo calmo ve sobre todo ruido
+idiosincrático, que diluye la correlación más de lo que la diluye agrupar
+todos los días de un régimen.
 
 ## 6.4 Correlación de todo el período (lo que mostraría una matriz estática única)
 

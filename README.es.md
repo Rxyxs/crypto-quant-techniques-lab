@@ -19,6 +19,71 @@ Un solo laboratorio, ocho técnicas independientes aplicadas a datos de mercado 
 | 07 | Detección de spoofing en order book | [`07-orderbook-spoofing-detection`](07-orderbook-spoofing-detection) | Isolation Forest + autoencoder sobre datos streaming de order book L2, con calibración de alert-budget. |
 | 08 | Backtesting de estrategias | [`08-strategy-backtesting`](08-strategy-backtesting) | Motor de backtesting estadístico comparando señales de trading bajo fricciones realistas. |
 
+## Qué encontró cada una de las ocho técnicas
+
+Todos los números provienen de una corrida real del pipeline de esa carpeta. Conviene leer la columna derecha antes que la del medio: **la mayoría de estos resultados son negativos, y se quedaron.**
+
+| # | Técnica | Número principal | Qué dice en realidad |
+|---|---|---|---|
+| **01** | Clasificación de dirección | Accuracy real en BTCUSDT **0,519**, ROC-AUC 0,536 | Apenas por encima de la moneda al aire. Sobre datos sintéticos con señal AR(1) inyectada llega a 0,596 — la brecha entre ambos *es* el hallazgo. El proyecto trata **>90% de accuracy como señal de fuga de datos, no como descubrimiento** |
+| **02** | Liquidez e impacto de precio | R² **0,100** a un horizonte de 1 minuto, 5,2% menos de RMSE | Habilidad real pero chica, y se evapora rápido: a 5 minutos el R² es −0,008 y a 15 minutos −0,068 — *peor que un pronóstico ingenuo*. El horizonte, no el modelo, decide si hay algo que predecir |
+| **03** | Pairs trading (cointegración) | Kalman **−12,2%** contra OLS estático **−43,7%** neto | Los dos pierden plata. El hedge ratio dinámico recorta la pérdida 3,6x y el drawdown máximo de −51,6% a −21,4%, con 13 operaciones en vez de 21. Una mejora que sigue siendo pérdida se reporta como exactamente eso |
+| **04** | Optimización de portafolio | Sharpe máximo **0,720**, asignando 74,6% BTC / 23,2% SOL / 2,2% BNB | Una asignación real y desbalanceada a partir de 24 meses de historia real de Binance — no la torta diversificada prolija de un ejemplo de manual |
+| **05** | Detección de regímenes | Correlación por pares **0,42 → 0,58** agrupada (1,37x), **0,29 → 0,56** rodante (1,90x) | La diversificación se degrada justo cuando se necesita. Dos estadísticos, dos magnitudes — [§6.3](05-regime-detection-correlation/README.es.md) explica por qué difieren en vez de citar el mayor |
+| **06** | Screening de sentimiento (NLP) | Recall de FinBERT: **100%** en negativas, 78,6% en positivas, **32,5% en neutrales** | El modelo empuja los titulares neutrales hacia las clases polares. Un punto ciego que aparece al medir recall por clase en vez de reportar un único número de accuracy |
+| **07** | Spoofing en el libro de órdenes | Precisión **0,92** con presupuesto de alertas del 0,5% contra **0,64** con la contaminación por defecto del 2% | El único resultado inequívocamente positivo. La precisión más que se duplica al calibrar contra lo que un analista puede revisar de verdad — 25 alertas por día, no el valor por defecto de una librería |
+| **08** | Backtesting de estrategias | Mejor Sharpe neto: **SMA Crossover en −0,358**; LightGBM el peor en −0,93 | Las cinco estrategias pierden plata neta de fricciones, y **la regla más simple le gana al gradient boosting**. El mayor turnover de LightGBM quema el 27,28% de su retorno en fricciones |
+
+**Una accuracy de señal de 0,507 igual produjo un Sharpe neto negativo** (08). Esa línea sola es la tesis del laboratorio: la accuracy no implica rentabilidad una vez que se cobran comisiones y slippage.
+
+---
+
+## Evidencia
+
+### Cinco estrategias, cinco Sharpe negativos, y gana la más simple
+
+![Sharpe neto y curvas de equity, cinco estrategias](08-strategy-backtesting/outputs/comparison_dashboard.png)
+
+**Cómo leerla.** A la izquierda, el Sharpe anualizado **neto de comisiones y slippage**, una barra por estrategia — el eje va de −0,8 a 0, así que toda barra es una pérdida y una barra *más corta* es mejor. A la derecha, las curvas de equity detrás de esas barras, todas partiendo en $1.
+
+El orden es el hallazgo. **LightGBM, el único modelo de machine learning de la comparación, es el peor de los cinco** (−0,93, terminando cerca de $0,53), mientras que un cruce de medias móviles 10/50 es el menos malo (−0,358, cerca de $0,84). El mecanismo está en las fricciones: LightGBM opera más, y un turnover más alto quema el 27,28% de su retorno bruto antes de que la calidad de la señal alcance a importar.
+
+### Una mejora que sigue siendo pérdida
+
+![Curva de equity Kalman contra OLS estático, neta de costos](03-pairs-trading-cointegration/outputs/figures/kalman_vs_ols_equity_curve.png)
+
+**Cómo leerla.** Las dos curvas son netas de costos de transacción y parten en 1,0. En rojo el hedge ratio OLS estático, ajustado una sola vez sobre toda la muestra; en verde la beta online del filtro de Kalman, reestimada día a día solo con datos disponibles hasta ese día.
+
+La roja se derrumba a ~0,5 en dos meses y no se recupera, terminando en −43,7%. La verde se mantiene cerca de 1,0 casi toda la ventana y termina en −12,2%. El estimador dinámico es inequívocamente mejor — pérdida 3,6x menor, drawdown de −51,6% a −21,4% — **y aun así pierde plata.** Presentarlo como un triunfo porque le ganó a la alternativa sería la lectura fácil; la honesta es que la estrategia no funciona en esta ventana y el hedge ratio nunca fue el problema limitante.
+
+Esta figura existe por una auditoría: el pipeline original ajustaba el OLS sobre *toda* la historia de precios y reusaba esa beta para puntuar días anteriores a los datos que la produjeron. Ese look-ahead bias ahora lo atrapa un test de invariancia por truncamiento que corre en CI.
+
+### La diversificación colapsa cuando se la necesita
+
+![Correlación por régimen](05-regime-detection-correlation/outputs/correlation_heatmap_by_regime.png)
+
+**Cómo leerla.** Una matriz de correlación por régimen descubierto, sobre los mismos ocho activos. Los regímenes son **no supervisados** — no se usó ninguna etiqueta de "este día fue un crash"; k=2 se eligió por silhouette sobre k=2..6.
+
+Cada par está más rojo a la izquierda. Agrupando los días de cada régimen, el promedio fuera de la diagonal sube de **0,419 en Bull Quiet a 0,576 en Bear Crash**. Un portafolio dimensionado con una única matriz de correlación estática carga más riesgo concentrado del que su propio modelo de riesgo asume, justo en los 389 días en que eso importa.
+
+---
+
+## El patrón que cruza las ocho
+
+Ocho técnicas, construidas por separado, sobre el mismo mercado. Convergen en una conclusión incómoda:
+
+> **El edge mayormente no está — y la forma honesta de mostrarlo es dejar los resultados negativos.**
+
+- **Las fricciones deciden el ranking, no la calidad del modelo.** En 08 el modelo de gradient boosting queda último y la regla técnica más simple queda primera, enteramente por el turnover. En 03 la pérdida bruta de −5,9% se convierte en −12,2% neta.
+- **La accuracy no es rentabilidad.** 0,507 de accuracy de señal en 08, con Sharpe neto negativo. 0,519 de accuracy sobre BTCUSDT real en 01, contra 0,596 sobre datos sintéticos con una señal inyectada a propósito.
+- **El horizonte decide si hay algo predecible.** En 02 el R² es 0,100 a un minuto y *negativo* a cinco y quince — el mismo modelo, las mismas features.
+- **Calibrar le gana a los valores por defecto.** En 07, pasar del 2% de contaminación por defecto de una librería a un presupuesto del 0,5% ajustado a la capacidad real de revisión de un analista lleva la precisión de 0,64 a 0,92.
+- **Un número alto se trata como síntoma.** 01 declara de frente que un >90% de accuracy en este problema se leería como señal de fuga de datos, no como resultado.
+
+Las dos técnicas que pasaron por una auditoría dedicada de integridad temporal (03 y 08) concentran 64 de los 120 tests del laboratorio, porque cada verificación de invariancia por truncamiento y de Sortino de esa auditoría corre en CI en cada push.
+
+---
+
 ## Metodología: integridad temporal, métricas ajustadas por riesgo y fricciones
 
 Dos técnicas -- 03 (pairs trading) y 08 (backtesting de estrategias) -- pasaron por una auditoría dedicada que el resto del laboratorio todavía no tiene. El README de cada carpeta trae el detalle completo; esto es el resumen a nivel de repositorio:

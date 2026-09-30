@@ -19,6 +19,71 @@ A single lab, eight standalone techniques applied to crypto market data — sign
 | 07 | Order-book spoofing detection | [`07-orderbook-spoofing-detection`](07-orderbook-spoofing-detection) | Isolation Forest + autoencoder over streaming L2 order-book data, with alert-budget calibration. | `python detect_spoofing.py` |
 | 08 | Strategy backtesting | [`08-strategy-backtesting`](08-strategy-backtesting) | Statistical backtesting engine comparing trading signals under realistic frictions. | `python backtest_engine.py` |
 
+## What the eight techniques found
+
+Every number comes from an actual run of that folder's pipeline. Read the right-hand column before the middle one: **most of these results are negative, and they stayed in.**
+
+| # | Technique | Headline number | What it actually says |
+|---|---|---|---|
+| **01** | Direction classification | Real BTCUSDT accuracy **0.519**, ROC-AUC 0.536 | Barely above the 50% coin flip. On synthetic data with an injected AR(1) signal it reaches 0.596 — the gap between the two *is* the finding. The project treats **>90% accuracy as a leakage red flag, not a discovery** |
+| **02** | Liquidity & price impact | R² **0.100** at a 1-minute horizon, 5.2% RMSE reduction | Genuine but small skill, and it evaporates fast: at 5 minutes R² is −0.008 and at 15 minutes −0.068 — *worse than a naive forecast*. The horizon, not the model, decides whether there is anything to predict |
+| **03** | Pairs trading (cointegration) | Kalman **−12.2%** vs. static OLS **−43.7%** net | Both lose money. The dynamic hedge ratio cuts the loss 3.6x and the max drawdown from −51.6% to −21.4%, on 13 trades instead of 21. An improvement that is still a loss is reported as exactly that |
+| **04** | Portfolio optimization | Max-Sharpe **0.720**, allocating 74.6% BTC / 23.2% SOL / 2.2% BNB | A real, lopsided allocation from 24 months of actual Binance history — not the tidy diversified pie a textbook example produces |
+| **05** | Regime detection | Pairwise correlation **0.42 → 0.58** pooled (1.37x), **0.29 → 0.56** rolling (1.90x) | Diversification degrades exactly when it is needed. Two statistics, two magnitudes — [§6.3](05-regime-detection-correlation#63-correlation-structure-by-regime) explains why they differ instead of quoting whichever is larger |
+| **06** | Sentiment screening (NLP) | FinBERT recall: **100%** negative, 78.6% positive, **32.5% neutral** | The model pushes neutral headlines into the polar classes. A blind spot surfaced by measuring per-class recall rather than reporting one headline accuracy number |
+| **07** | Order-book spoofing | Precision **0.92** at a 0.5% alert budget vs. **0.64** at default 2% contamination | The one unambiguously positive result. Precision more than doubles by calibrating to what one analyst can actually review — 25 alerts a day, not a library default |
+| **08** | Strategy backtesting | Best net Sharpe: **SMA Crossover at −0.358**; LightGBM worst at −0.93 | All five strategies lose money net of frictions, and **the plainest rule beats gradient boosting**. LightGBM's higher turnover burns 27.28% of its return on frictions |
+
+**A signal accuracy of 0.507 still produced a net-negative Sharpe** (08). That single line is the lab's thesis: accuracy does not imply profitability once fees and slippage are charged.
+
+---
+
+## Evidence
+
+### Five strategies, five negative Sharpes, and the simplest one wins
+
+![Net Sharpe and equity curves, five strategies](08-strategy-backtesting/outputs/comparison_dashboard.png)
+
+**How to read it.** Left: annualized Sharpe **net of fees and slippage**, one bar per strategy — note that the axis runs from −0.8 to 0, so every bar is a loss and a *shorter* bar is better. Right: the equity curves behind those bars, all starting at $1.
+
+The ordering is the finding. **LightGBM, the only machine-learning model in the comparison, is the worst of the five** (−0.93, ending near $0.53), while a 10/50 simple moving-average crossover is the least bad (−0.358, ending near $0.84). The mechanism is in the frictions: LightGBM trades more, and a higher turnover rate burns 27.28% of its gross return before the signal quality ever gets to matter.
+
+### An improvement that is still a loss
+
+![Kalman vs. static OLS equity curve, net of costs](03-pairs-trading-cointegration/outputs/figures/kalman_vs_ols_equity_curve.png)
+
+**How to read it.** Both curves are net of transaction costs and start at 1.0. Red is the static OLS hedge ratio fitted once over the whole sample; green is the Kalman filter's online beta, re-estimated day by day from data available up to that day only.
+
+Red collapses to ~0.5 within two months and never recovers, ending at −43.7%. Green tracks near 1.0 for most of the window and ends at −12.2%. The dynamic estimator is unambiguously better — 3.6x smaller loss, drawdown cut from −51.6% to −21.4% — **and it still loses money.** Presenting it as a win because it beat the alternative would be the easy read; the honest one is that the strategy does not work in this window and the hedge ratio was never the binding problem.
+
+This figure exists because of an audit: the original pipeline fitted OLS on the *entire* price history and reused that beta to score days that happened before the data behind it existed. That look-ahead bias is now caught by a truncation-invariance test that runs in CI.
+
+### Diversification collapses when it is needed
+
+![Correlation by regime](05-regime-detection-correlation/outputs/correlation_heatmap_by_regime.png)
+
+**How to read it.** One correlation matrix per discovered regime, over the same eight assets. The regimes are **unsupervised** — no "this day was a crash" label was used; k=2 was chosen by silhouette score over k=2..6.
+
+Every pair is redder on the left. Pooled across each regime's days, the off-diagonal mean rises from **0.419 in Bull Quiet to 0.576 in Bear Crash**. A portfolio sized on a single static correlation matrix is carrying more concentrated risk than its own risk model assumes, precisely in the 389 days when that matters.
+
+---
+
+## The pattern across all eight
+
+Eight techniques, built independently, on the same market. They converge on one uncomfortable conclusion:
+
+> **The edge mostly isn't there — and the honest way to show that is to keep the negative results.**
+
+- **Frictions decide the ranking, not model quality.** In 08 the gradient-boosting model finishes last and the simplest technical rule finishes first, entirely because of turnover. In 03 the gross loss of −5.9% becomes −12.2% net.
+- **Accuracy is not profitability.** 0.507 signal accuracy in 08, net-negative Sharpe. 0.519 accuracy on real BTCUSDT in 01, against a 0.596 on synthetic data with a signal deliberately injected.
+- **The horizon decides whether anything is predictable at all.** In 02, R² is 0.100 at one minute and *negative* at five and fifteen — the same model, the same features.
+- **Calibration beats defaults.** In 07, moving from a library's default 2% contamination to a 0.5% budget matched to one analyst's actual review capacity takes precision from 0.64 to 0.92.
+- **A high number is treated as a symptom.** 01 states outright that >90% accuracy on this problem would be read as a leakage red flag rather than a result.
+
+The two techniques that went through a dedicated temporal-integrity audit (03 and 08) carry 64 of the lab's 120 tests, because every truncation-invariance and Sortino check from that audit runs in CI on every push.
+
+---
+
 ## Methodology: temporal integrity, risk-adjusted metrics, and frictions
 
 Two techniques — 03 (pairs trading) and 08 (strategy backtesting) — went through a dedicated audit that the rest of this lab hasn't (yet). Each folder's own README has the full write-up; this is the summary that matters at the repo level:

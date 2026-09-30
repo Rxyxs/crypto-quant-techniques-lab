@@ -38,7 +38,7 @@ checked against ground truth, not just eyeballed.
 
 | Metric | Result | What it means |
 |---|---|---|
-| Avg. pairwise correlation, calm vs. turbulent regime | 0.29 vs. **0.56** | Diversification benefit nearly halves exactly when it's needed most -- hidden by a single static correlation matrix |
+| Avg. pairwise correlation, calm vs. turbulent regime | 0.29 vs. **0.56** (rolling-window feature) — 0.42 vs. **0.58** pooled per regime | Diversification benefit degrades exactly when it's needed most, on either measure — see §6.3 for why the two differ and which one the heatmap shows |
 | Regime count selection | k=2 (silhouette-chosen), not the 4 "true" simulator regimes | Honest finding: k=2 still recovers the calm-vs-turbulent stylized fact clearly, even though it doesn't recover every injected regime (Adjusted Rand Index 0.158) |
 | Output format | Machine-readable `outputs/regime_summary.csv` | Feeds directly into a position-sizing or hedging rule, not just a plot |
 
@@ -192,11 +192,25 @@ coarser, and arguably more actionable, **calm-vs-turbulent** split.
 
 ![Correlation heatmap by regime](outputs/correlation_heatmap_by_regime.png)
 
-This is the central business finding: average pairwise correlation nearly
-**doubles**, from 0.29 to 0.56, between the calm and turbulent regimes.
-Every asset pair's correlation increases in the turbulent regime — the
-correlation-breakdown effect the simulator was deliberately built to
-reproduce, and the mechanism behind §2's diversification-collapse point.
+This is the central business finding: **every single asset pair becomes more
+correlated in the turbulent regime** — the correlation-breakdown effect the
+simulator was deliberately built to reproduce, and the mechanism behind §2's
+diversification-collapse point.
+
+**Two different statistics, and the gap between them matters.** The heatmap
+above pools all the days assigned to each regime and computes one correlation
+matrix per regime (`np.corrcoef` in `plot_correlation_heatmap_by_regime`). Its
+off-diagonal mean goes from **0.419 (calm) to 0.576 (turbulent) — a 1.37x
+increase**. The `avg_pairwise_corr_mean` column in §6.2's table is a different
+quantity: the mean of the *rolling-window* pairwise correlation used as a
+clustering feature, averaged over the days in each regime, which goes from
+**0.294 to 0.559 — 1.90x, close to a doubling**.
+
+Both are correct and both support the same conclusion, but they are not
+interchangeable. Quoting the rolling figure next to the pooled heatmap would
+misstate what the figure shows. The rolling statistic moves more because a
+short window inside a calm stretch sees mostly idiosyncratic noise, which
+dilutes correlation more than pooling a whole regime's days does.
 
 ## 6.4 Full-period correlation (what a single static matrix would show)
 
