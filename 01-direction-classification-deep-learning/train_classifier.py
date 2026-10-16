@@ -30,6 +30,8 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
+from training import fit
+
 SEED = 42
 N_CANDLES = 20_000
 SYMBOL = "BTCUSDT"
@@ -40,8 +42,9 @@ VAL_FRACTION = 0.15
 # el resto (0.15) es test
 
 BATCH_SIZE = 128
-MAX_EPOCHS = 100
-PATIENCE = 12
+MIN_EPOCHS = 100  # ninguna red se detiene antes de 100 epocas
+MAX_EPOCHS = 300
+PATIENCE = 15
 LEARNING_RATE = 1e-3
 HIDDEN_DIMS = (64, 32, 16)
 DROPOUT = 0.2
@@ -200,71 +203,31 @@ def train_variant(
     X_val: np.ndarray,
     y_val: np.ndarray,
     device: torch.device,
+    run_name: str = "simulated",
 ) -> tuple[DenseClassifier, TrainHistory]:
+    """Entrena una variante con el protocolo comun (``training.fit``): al menos
+    100 epocas, early stopping sobre la validacion temporal, mejor epoca
+    restaurada y checkpoint por epoca."""
+    torch.manual_seed(SEED)
     model = DenseClassifier(input_dim=X_train.shape[1], activation=activation).to(device)
-    train_loader = DataLoader(
-        TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train)),
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-    )
-    X_val_t = torch.from_numpy(X_val).to(device)
-    y_val_t = torch.from_numpy(y_val).to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = nn.BCEWithLogitsLoss()
+    def val_metrics(logits: torch.Tensor) -> dict:
+        probs = torch.sigmoid(logits).cpu().numpy()
+        return {"val_accuracy": float(((probs >= 0.5).astype(np.int8) == y_val).mean()),
+                "val_auc": float(roc_auc_score(y_val, probs))}
 
-    history = TrainHistory()
-    best_state = None
-    best_val_loss = float("inf")
-    patience_counter = 0
-
-    for epoch in range(1, MAX_EPOCHS + 1):
-        model.train()
-        epoch_loss = 0.0
-        for xb, yb in train_loader:
-            xb, yb = xb.to(device), yb.to(device)
-            optimizer.zero_grad()
-            logits = model(xb)
-            loss = criterion(logits, yb)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item() * xb.size(0)
-        train_loss = epoch_loss / len(X_train)
-
-        model.eval()
-        with torch.no_grad():
-            val_logits = model(X_val_t)
-            val_loss = criterion(val_logits, y_val_t).item()
-            val_probs = torch.sigmoid(val_logits).cpu().numpy()
-            val_acc = float(((val_probs >= 0.5).astype(np.int8) == y_val).mean())
-            val_auc = roc_auc_score(y_val, val_probs)
-
-        history.train_loss.append(train_loss)
-        history.val_loss.append(val_loss)
-        history.val_accuracy.append(val_acc)
-
-        if val_loss < best_val_loss - 1e-6:
-            best_val_loss = val_loss
-            best_state = {k: v.clone() for k, v in model.state_dict().items()}
-            history.best_epoch = epoch
-            history.best_val_auc = val_auc
-            patience_counter = 0
-        else:
-            patience_counter += 1
-
+    def log(epoch: int, row: dict) -> None:
         if epoch == 1 or epoch % 10 == 0:
-            print(
-                f"  [{activation:>4}] epoch {epoch:3d}/{MAX_EPOCHS}  "
-                f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}  "
-                f"val_acc={val_acc:.3f}  val_auc={val_auc:.3f}"
-            )
+            print(f"  [{activation:>4}] epoch {epoch:3d}/{MAX_EPOCHS}  train_loss={row['train_loss']:.4f}  "
+                  f"val_loss={row['val_loss']:.4f}  val_acc={row['val_accuracy']:.3f}  val_auc={row['val_auc']:.3f}")
 
-        if patience_counter >= PATIENCE:
-            print(f"  [{activation:>4}] early stopping en epoch {epoch} (mejor epoch: {history.best_epoch})")
-            break
-
-    if best_state is not None:
-        model.load_state_dict(best_state)
+    h = fit(model, nn.BCEWithLogitsLoss(), X_train, y_train, X_val, y_val, device,
+            batch_size=BATCH_SIZE, lr=LEARNING_RATE, seed=SEED, val_metrics=val_metrics,
+            min_epochs=MIN_EPOCHS, max_epochs=MAX_EPOCHS, patience=PATIENCE,
+            checkpoint_path=MODELS_DIR / "checkpoints" / f"dense_{run_name}_{activation}.ckpt", log=log)
+    print(f"  [{activation:>4}] mejor epoch {h['best_epoch']} de {h['epochs_run']}")
+    history = TrainHistory(train_loss=h["train_loss"], val_loss=h["val_loss"], val_accuracy=h["val_accuracy"],
+                           best_epoch=h["best_epoch"], best_val_auc=h["at_best"].get("val_auc", 0.0))
     return model, history
 
 

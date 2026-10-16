@@ -25,7 +25,7 @@ Todos los números provienen de una corrida real del pipeline de esa carpeta. Co
 
 | # | Técnica | Número principal | Qué dice en realidad |
 |---|---|---|---|
-| **01** | Clasificación de dirección | Accuracy real en BTCUSDT **0,519**, ROC-AUC 0,536 | Apenas por encima de la moneda al aire. Sobre datos sintéticos con señal AR(1) inyectada llega a 0,596 — la brecha entre ambos *es* el hallazgo. El proyecto trata **>90% de accuracy como señal de fuga de datos, no como descubrimiento** |
+| **01** | Clasificación de dirección | Accuracy real en BTCUSDT **0,524**, ROC-AUC 0,542 | Apenas por encima de la moneda al aire. Sobre datos sintéticos con señal AR(1) inyectada llega a 0,598 — la brecha entre ambos *es* el hallazgo. El proyecto trata **>90% de accuracy como señal de fuga de datos, no como descubrimiento** |
 | **02** | Liquidez e impacto de precio | R² **0,100** a un horizonte de 1 minuto, 5,2% menos de RMSE | Habilidad real pero chica, y se evapora rápido: a 5 minutos el R² es −0,008 y a 15 minutos −0,068 — *peor que un pronóstico ingenuo*. El horizonte, no el modelo, decide si hay algo que predecir |
 | **03** | Pairs trading (cointegración) | Kalman **−12,2%** contra OLS estático **−43,7%** neto | Los dos pierden plata. El hedge ratio dinámico recorta la pérdida 3,6x y el drawdown máximo de −51,6% a −21,4%, con 13 operaciones en vez de 21. Una mejora que sigue siendo pérdida se reporta como exactamente eso |
 | **04** | Optimización de portafolio | Sharpe máximo **0,720**, asignando 74,6% BTC / 23,2% SOL / 2,2% BNB | Una asignación real y desbalanceada a partir de 24 meses de historia real de Binance — no la torta diversificada prolija de un ejemplo de manual |
@@ -75,7 +75,7 @@ Ocho técnicas, construidas por separado, sobre el mismo mercado. Convergen en u
 > **El edge mayormente no está — y la forma honesta de mostrarlo es dejar los resultados negativos.**
 
 - **Las fricciones deciden el ranking, no la calidad del modelo.** En 08 el modelo de gradient boosting queda último y la regla técnica más simple queda primera, enteramente por el turnover. En 03 la pérdida bruta de −5,9% se convierte en −12,2% neta.
-- **La accuracy no es rentabilidad.** 0,507 de accuracy de señal en 08, con Sharpe neto negativo. 0,519 de accuracy sobre BTCUSDT real en 01, contra 0,596 sobre datos sintéticos con una señal inyectada a propósito.
+- **La accuracy no es rentabilidad.** 0,507 de accuracy de señal en 08, con Sharpe neto negativo. 0,524 de accuracy sobre BTCUSDT real en 01, contra 0,598 sobre datos sintéticos con una señal inyectada a propósito.
 - **El horizonte decide si hay algo predecible.** En 02 el R² es 0,100 a un minuto y *negativo* a cinco y quince — el mismo modelo, las mismas features.
 - **Calibrar le gana a los valores por defecto.** En 07, pasar del 2% de contaminación por defecto de una librería a un presupuesto del 0,5% ajustado a la capacidad real de revisión de un analista lleva la precisión de 0,64 a 0,92.
 - **Un número alto se trata como síntoma.** 01 declara de frente que un >90% de accuracy en este problema se leería como señal de fuga de datos, no como resultado.

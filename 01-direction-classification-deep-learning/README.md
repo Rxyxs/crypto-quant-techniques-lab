@@ -75,8 +75,8 @@ not a suspiciously perfect one.
 
 | Metric | Result | What it means |
 |---|---|---|
-| Synthetic test accuracy / ROC-AUC | 0.596 / 0.629 | A real, modest edge from the injected AR(1) momentum -- not saturated, kept credible by leakage checks |
-| **Real BTCUSDT test accuracy / ROC-AUC** | **0.519 / 0.536** | Barely above the 50% random baseline -- the honest, expected result once the synthetic momentum signal is removed |
+| Synthetic test accuracy / ROC-AUC | 0.598 / 0.630 | A real, modest edge from the injected AR(1) momentum -- not saturated, kept credible by leakage checks |
+| **Real BTCUSDT test accuracy / ROC-AUC** | **0.524 / 0.542** | Barely above the 50% random baseline -- the honest, expected result once the synthetic momentum signal is removed |
 | Activation function winner flips | Tanh (synthetic) vs. ReLU (real) | A genuine finding from running both regimes, not asserted from one dataset |
 | >90% accuracy treated as | A leakage red flag, not a discovery | The project's own design philosophy, stated explicitly rather than implied |
 
@@ -459,15 +459,15 @@ meaningfully different here," not "Tanh is better."
 
 | Metric | Value |
 |---|---:|
-| Test accuracy | 0.596 |
-| Test ROC-AUC | 0.629 |
-| Precision (bullish) | 0.629 |
-| Recall (bullish) | 0.602 |
-| Precision (bearish) | 0.561 |
-| Recall (bearish) | 0.588 |
+| Test accuracy | 0.598 |
+| Test ROC-AUC | 0.630 |
+| Precision (bullish) | 0.628 |
+| Recall (bullish) | 0.614 |
+| Precision (bearish) | 0.565 |
+| Recall (bearish) | 0.579 |
 
 A random classifier on this balanced (50/50) task would score 0.500
-accuracy; 0.596 reflects the model picking up a real, if modest, share of
+accuracy; 0.598 reflects the model picking up a real, if modest, share of
 the injected AR(1) momentum (φ = 0.30) through the momentum/return features
 — consistent with the ~0.60 accuracy ceiling implied by the sign-persistence
 of a correlated Gaussian process at this φ, not an inflated or cherry-picked
@@ -497,9 +497,9 @@ ReLU-vs-Tanh training used in §7.1–§7.3.
 | Metric | Synthetic (§7.3) | **Real BTCUSDT** |
 |---|---:|---:|
 | Winning activation | Tanh | ReLU |
-| Best validation ROC-AUC | 0.627 | 0.534 |
-| Test accuracy | 0.596 | **0.519** |
-| Test ROC-AUC | 0.629 | **0.536** |
+| Best validation ROC-AUC | 0.627 | 0.537 |
+| Test accuracy | 0.598 | **0.524** |
+| Test ROC-AUC | 0.630 | **0.542** |
 
 ![Real confusion matrix](outputs/figures/confusion_matrix_real.png)
 
@@ -507,8 +507,8 @@ ReLU-vs-Tanh training used in §7.1–§7.3.
 
 **This is the honest finding the disclaimer in §1–§2 was pointing at**: on
 real BTCUSDT candles, the same 14 features and the same dense classifier
-land at 51.9% accuracy and 0.536 AUC — barely above the 50% random baseline,
-and far below the synthetic run's 59.6% / 0.629. The gap is not a pipeline
+land at 52.4% accuracy and 0.542 AUC — barely above the 50% random baseline,
+and far below the synthetic run's 59.8% / 0.630. The gap is not a pipeline
 bug; it is the expected outcome of removing the disclosed φ = 0.30 AR(1)
 momentum term that made the synthetic task learnable in the first place.
 Real hourly BTC/USDT returns are close enough to a random walk that
@@ -530,14 +530,16 @@ matrix normalizations, and the PnL curve) is in
 |---|---:|
 | Class balance (Bearish / Neutral / Bullish) | 34.5% / 29.8% / 35.8% |
 | Out-of-sample test windows (5 folds, concatenated) | 9,978 |
-| **Accuracy (aggregate, out-of-sample)** | **0.391** |
+| **Accuracy (aggregate, out-of-sample)** | **0.395** |
 | Random baseline (3 classes) | 0.333 |
-| F1 macro (aggregate) | 0.385 |
-| Total position changes ("trades") | 3,707 |
-| Gross PnL (no costs), cumulative log-return | +0.073 |
-| Total cost paid (10 bps × trades) | 5.803 |
-| **Net PnL (after cost + slippage), cumulative log-return** | **−5.730** |
-| Annualized Sharpe-like ratio (net) | −13.24 |
+| F1 macro (aggregate) | 0.384 |
+| Total position changes ("trades") | 3,746 |
+| Gross PnL (no costs), cumulative log-return | +0.397 |
+| Total cost paid (10 bps × trades) | 5.969 |
+| **Net PnL (after cost + slippage), cumulative log-return** | **−5.572** |
+| Annualized Sharpe-like ratio (net) | −12.74 |
+
+**Training protocol (all networks in this project, `training.py`).** Validation is always a block *before* the test period (the tail of each fold's training block in the walk-forward, the 15% after train in §7.1-§7.5). Each network trains at least 100 epochs (at most 300); after that, early stopping ends the run after 15 epochs without improvement and restores the best epoch, and the full state is checkpointed every epoch so an interrupted run resumes. Validation loss bottoms out early — epochs 2-13 across the five walk-forward folds, 2-34 for the dense networks — so each run returns those weights; compared with the previous 40-epoch cap the results move only slightly (aggregate accuracy 0.391 → 0.395).
 
 ![Walk-forward learning curve animated](outputs/figures/walkforward_learning_curves_animated.gif)
 
@@ -550,14 +552,14 @@ matrix normalizations, and the PnL curve) is in
 Two findings, both real and neither hidden:
 
 1. **The richer architecture does recover a genuine, walk-forward-validated
-   edge over random guessing** — 39.1% accuracy against a 33.3% baseline
-   for 3 balanced classes, consistent across all 5 folds (37.6%–41.8%
+   edge over random guessing** — 39.5% accuracy against a 33.3% baseline
+   for 3 balanced classes, consistent across all 5 folds (38.2%–41.3%
    range per fold, see the notebook), not a lucky single split.
 2. **That edge does not survive contact with realistic trading costs.**
-   Gross PnL is close to flat (+0.073 cumulative log-return over ~10,000
+   Gross PnL is close to flat (+0.397 cumulative log-return over ~10,000
    test candles — barely above breakeven even before paying anything to
-   trade); net of 10 bps per position change across 3,707 trades, PnL is
-   sharply negative (−5.730, annualized Sharpe-like ratio of −13.2). The
+   trade); net of 10 bps per position change across 3,746 trades, PnL is
+   sharply negative (−5.572, annualized Sharpe-like ratio of −12.7). The
    model is changing its mind often enough, on a signal weak enough, that
    transaction costs alone are enough to turn a marginal statistical edge
    into a clear economic loss.
@@ -580,7 +582,7 @@ comparison below isolates the effect of the model family, not the data.
 |---|---:|---:|
 | Logistic Regression (interpretable baseline) | 0.596 | 0.629 |
 | LightGBM (tree ensemble) | 0.586 | 0.620 |
-| **Dense NN — Tanh** (§7.3, winner) | **0.596** | **0.629** |
+| **Dense NN — Tanh** (§7.3, winner) | **0.598** | **0.630** |
 
 ![ROC comparison of the three approaches](outputs/figures/roc_comparison_3models.png)
 
@@ -615,31 +617,31 @@ SELECT model, accuracy, roc_auc FROM model_comparison ORDER BY run_ts DESC;
   shallow dense classifier over standardized tabular features (0.625 vs.
   0.627 validation AUC) — the activation choice was not the bottleneck here.
 - **The model recovers a real, moderate share of the injected momentum
-  signal** (59.6% test accuracy against a 50% random baseline), which is
+  signal** (59.8% test accuracy against a 50% random baseline), which is
   the expected, non-inflated outcome given φ = 0.30 and the theoretical
   sign-persistence bound for a correlated Gaussian AR(1) process.
 - **Chronological splitting and look-ahead-safe features were verified, not
   assumed** — the honest, moderate accuracy in §7.3 is itself evidence
   against leakage; a leaky pipeline on this kind of feature set would show
   far higher numbers.
-- **On real BTCUSDT data, the same pipeline lands at 51.9% accuracy / 0.536
+- **On real BTCUSDT data, the same pipeline lands at 52.4% accuracy / 0.542
   AUC** (§7.5) — barely above the random baseline, confirming directly
-  rather than just asserting that the synthetic run's 59.6% depends on the
+  rather than just asserting that the synthetic run's 59.8% depends on the
   disclosed, injected momentum term and does not represent a real,
   exploitable edge on actual crypto markets.
 - **A richer architecture (Conv1D + Multi-Head Attention) and a stricter
   validation scheme (walk-forward) do recover a small, stable, real edge**
-  on real BTCUSDT — 39.1% accuracy on a balanced 3-class problem against a
+  on real BTCUSDT — 39.5% accuracy on a balanced 3-class problem against a
   33.3% random baseline, consistent across all 5 walk-forward folds (§7.6)
   — but **that edge does not survive realistic transaction costs**: net
-  PnL after 10 bps/trade is sharply negative (−5.730 cumulative
-  log-return, Sharpe-like −13.2), even though gross PnL before costs is
+  PnL after 10 bps/trade is sharply negative (−5.572 cumulative
+  log-return, Sharpe-like −12.7), even though gross PnL before costs is
   close to flat. Model architecture and validation rigor are necessary but
   not sufficient; the trading-cost question is a separate, harder bar that
   this project measures rather than assumes away.
 - **Neither the dense NN nor a LightGBM ensemble beats a plain Logistic
   Regression** on the 14 hand-engineered synthetic features (§7.7,
-  0.596/0.629 for both Logistic Regression and the dense NN vs.
+  0.596/0.629 for Logistic Regression and 0.598/0.630 for the dense NN vs.
   0.586/0.620 for LightGBM) — with the momentum signal itself linear and
   the features already pre-aggregated, extra model capacity has nothing
   left to exploit; it is the raw windowed sequence input in §7.6, not a

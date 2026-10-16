@@ -525,10 +525,10 @@ All three approaches run on the identical simulated book and feature set
 | Model | Variant | Precision | Recall | F1 | Alerts flagged |
 |---|---|---:|---:|---:|---:|
 | Z-score baseline | `order_book_imbalance`, \|z\|≥3 | 0.972 | 0.824 | 0.892 | 72 |
-| Autoencoder (PyTorch) | ReLU | 0.650 | 0.765 | 0.703 | 100 |
 | Isolation Forest | L2 cross-level aggregates | 0.640 | 0.753 | 0.692 | 100 |
-| Autoencoder (PyTorch) | GELU | 0.640 | 0.753 | 0.692 | 100 |
-| Autoencoder (PyTorch) | Swish (SiLU) | 0.580 | 0.682 | 0.627 | 100 |
+| Autoencoder (PyTorch) | ReLU | 0.540 | 0.635 | 0.584 | 100 |
+| Autoencoder (PyTorch) | GELU | 0.160 | 0.188 | 0.173 | 100 |
+| Autoencoder (PyTorch) | Swish (SiLU) | 0.160 | 0.188 | 0.173 | 100 |
 
 **Honest finding: the single-feature z-score baseline wins on this
 simulated book.** `order_book_imbalance` alone, thresholded at 3 standard
@@ -545,12 +545,20 @@ calibration (0.92 precision at a 0.5% budget) shows the Isolation Forest
 point instead of a fixed contamination — the same calibration would likely
 help the autoencoder too, and is listed under Future Work below.
 
-**Activation choice (ReLU vs. GELU vs. Swish) is a smaller effect than
-model choice**, but not negligible: ReLU narrowly edges out GELU and Swish
-on this task and feature set, while Swish trains to a similar final loss
-but generalizes worse to the anomaly-detection metric — reconstruction
-loss alone doesn't fully predict downstream precision/recall, which is why
-the ablation reports both (§3.6a).
+**Training the autoencoder longer made it a worse detector.** The
+autoencoder now trains at least 100 epochs (at most 300) with early
+stopping on the reconstruction error of the 20% of snapshots held out from
+training (unlabelled, so no spoof labels are used), restores the best epoch
+and checkpoints every epoch. The previous fixed 60 epochs gave F1 0.70
+(ReLU), 0.69 (GELU) and 0.63 (Swish). Trained to convergence (best epochs
+148, 297 and 300), F1 falls to 0.58 for ReLU and to 0.17 for GELU and
+Swish: the better the network learns to reconstruct order flow in general,
+the better it also reconstructs the spoof bursts, and their reconstruction
+error stops standing out. Lower validation loss is the wrong target for an
+anomaly detector, and the epoch count that would work best can only be
+found with the spoof labels, which a deployed detector does not have. The
+converged run is the one reported; the z-score baseline and the Isolation
+Forest remain the better detectors on this book.
 
 ## 7.8 Autoencoder reconstruction error distribution
 

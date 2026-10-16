@@ -554,10 +554,10 @@ features (seed 42). Desde `metrics_store.py` / `outputs/metrics.duckdb`:
 | Modelo | Variante | Precisión | Recall | F1 | Alertas marcadas |
 |---|---|---:|---:|---:|---:|
 | Baseline z-score | `order_book_imbalance`, \|z\|≥3 | 0,972 | 0,824 | 0,892 | 72 |
-| Autoencoder (PyTorch) | ReLU | 0,650 | 0,765 | 0,703 | 100 |
 | Isolation Forest | Agregados cross-level L2 | 0,640 | 0,753 | 0,692 | 100 |
-| Autoencoder (PyTorch) | GELU | 0,640 | 0,753 | 0,692 | 100 |
-| Autoencoder (PyTorch) | Swish (SiLU) | 0,580 | 0,682 | 0,627 | 100 |
+| Autoencoder (PyTorch) | ReLU | 0,540 | 0,635 | 0,584 | 100 |
+| Autoencoder (PyTorch) | GELU | 0,160 | 0,188 | 0,173 | 100 |
+| Autoencoder (PyTorch) | Swish (SiLU) | 0,160 | 0,188 | 0,173 | 100 |
 
 **Hallazgo honesto: el baseline z-score de una sola feature gana en este
 libro simulado.** `order_book_imbalance` sola, con umbral de 3 desviaciones
@@ -576,13 +576,21 @@ comparado en un punto de operación equivalente en vez de una contaminación
 fija — la misma calibración probablemente también ayudaría al autoencoder,
 y queda listada en Trabajo Futuro más abajo.
 
-**La elección de activación (ReLU vs. GELU vs. Swish) es un efecto más
-pequeño que la elección de modelo**, pero no despreciable: ReLU le gana
-por poco a GELU y Swish en esta tarea y conjunto de features, mientras
-Swish entrena a una pérdida final similar pero generaliza peor a la
-métrica de detección de anomalías — la pérdida de reconstrucción sola no
-predice completamente el recall/precisión final, por lo que el ablation
-reporta ambos (§3.6a).
+**Entrenar más el autoencoder lo convirtió en un peor detector.** El
+autoencoder ahora entrena al menos 100 épocas (máximo 300) con early
+stopping sobre el error de reconstrucción del 20% de snapshots reservado
+del entrenamiento (sin etiquetas, así que no se usa ninguna etiqueta de
+spoofing), restaura la mejor época y guarda un checkpoint cada época. Las 60
+épocas fijas anteriores daban F1 0,70 (ReLU), 0,69 (GELU) y 0,63 (Swish).
+Entrenado hasta converger (mejores épocas 148, 297 y 300), el F1 cae a 0,58
+con ReLU y a 0,17 con GELU y Swish: mientras mejor aprende la red a
+reconstruir el flujo de órdenes en general, mejor reconstruye también las
+ráfagas de spoofing, y su error de reconstrucción deja de destacar. Una loss
+de validación más baja es el objetivo equivocado para un detector de
+anomalías, y el número de épocas que funcionaría mejor solo se puede
+encontrar con las etiquetas de spoofing, que un detector en producción no
+tiene. Se reporta la corrida hasta converger; el baseline de z-score y el
+Isolation Forest siguen siendo los mejores detectores en este libro.
 
 ## 7.8 Distribución del error de reconstrucción del autoencoder
 

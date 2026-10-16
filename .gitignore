@@ -26,3 +26,6 @@ Thumbs.db
 # language as HTML instead of the real Python code. Regenerate locally from
 # each module's source script.
 **/outputs/interactive/
+
+# Checkpoints de entrenamiento de las redes (se regeneran al entrenar)
+**/checkpoints/

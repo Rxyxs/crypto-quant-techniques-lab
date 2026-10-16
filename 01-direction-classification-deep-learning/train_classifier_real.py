@@ -116,9 +116,9 @@ def main() -> None:
     X_train, X_val, X_test = (scaler.transform(a).astype(np.float32) for a in (X_train, X_val, X_test))
 
     print("\nEntrenando variante ReLU sobre datos reales...")
-    model_relu, history_relu = train_variant("relu", X_train, y_train, X_val, y_val, device)
+    model_relu, history_relu = train_variant("relu", X_train, y_train, X_val, y_val, device, run_name="real")
     print("\nEntrenando variante Tanh sobre datos reales...")
-    model_tanh, history_tanh = train_variant("tanh", X_train, y_train, X_val, y_val, device)
+    model_tanh, history_tanh = train_variant("tanh", X_train, y_train, X_val, y_val, device, run_name="real")
 
     plot_training_comparison(history_relu, history_tanh, suffix="_real")
 

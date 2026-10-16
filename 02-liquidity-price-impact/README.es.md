@@ -265,13 +265,13 @@ corrida multi-horizonte. Las métricas de los tres modelos se persisten en
 |---|---:|---:|---:|---:|---:|---:|
 | Baseline lineal Ridge | 1 min | 0.000345 | 0.000239 | 0.063 | 0.000357 | 3.3% |
 | **XGBoost** | 1 min | **0.000338** | **0.000227** | **0.100** | 0.000357 | **5.2%** |
-| MLP PyTorch (mejor: Swish) | 1 min | 0.000356 | 0.000241 | −0.001 | 0.000357 | ~0% |
+| MLP PyTorch (mejor: Swish) | 1 min | 0.000357 | 0.000243 | −0.007 | 0.000357 | ~0% (peor) |
 | Baseline lineal Ridge | 5 min | 0.000907 | 0.000621 | −0.016 | 0.000903 | ~0% (peor) |
 | XGBoost | 5 min | 0.000904 | 0.000620 | −0.008 | 0.000903 | ~0% (peor) |
-| MLP PyTorch | 5 min | 0.000905 | 0.000621 | −0.011 | 0.000903 | ~0% (peor) |
+| MLP PyTorch | 5 min | 0.000902 | 0.000620 | −0.004 | 0.000903 | ~0% |
 | Baseline lineal Ridge | 15 min | 0.001563 | 0.001104 | −0.044 | 0.001548 | −1.0% |
 | XGBoost | 15 min | 0.001581 | 0.001112 | −0.068 | 0.001548 | −2.2% |
-| MLP PyTorch | 15 min | 0.001550 | 0.001092 | −0.027 | 0.001548 | −0.2% |
+| MLP PyTorch | 15 min | 0.001540 | 0.001084 | −0.013 | 0.001548 | 0,5% |
 
 En el horizonte de 1 minuto, donde la señal realmente existe (§7.2), el
 orden es XGBoost > Ridge > MLP: el ensamble de árboles no-lineal captura
@@ -296,9 +296,16 @@ explicada.
 ![Curvas de loss PyTorch](outputs/figures/pytorch_loss_curves.png)
 
 Loss Huber de entrenamiento por época para las tres activaciones, sobre
-los mismos datos/inicialización — Swish converge a la loss de
-entrenamiento más baja de las tres, consistente con que también gana la
-comparación fuera de muestra de arriba. El GIF animado dibuja la curva de cada activación época por época con la loss actualizada en vivo.
+los mismos datos/inicialización. Cada red entrena al menos 100 épocas
+(máximo 300); el early stopping mira el último 15% del periodo de
+entrenamiento (todavía antes de la ventana de test), corta tras 15 épocas
+sin mejora y restaura la mejor época, y el estado se guarda en un
+checkpoint cada época. La activación se elige con esa loss de validación,
+no con el RMSE de test. La loss de validación toca su mínimo cerca de la
+época 20 en las tres, así que entrenar más que las 25 épocas fijas
+anteriores no agrega nada: el MLP sigue en el nivel del baseline ingenuo
+en todos los horizontes, y las tres activaciones son indistinguibles (R²
+a 1 minuto entre −0,007 y −0,008). El GIF animado dibuja la curva de cada activación época por época con la loss actualizada en vivo.
 
 ![PyTorch predicho vs real](outputs/figures/pytorch_predicted_vs_actual.png)
 

@@ -48,6 +48,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from model_conv_attention import CLASS_NAMES, N_CLASSES, WINDOW_LENGTH, Conv1DAttentionClassifier
 from train_classifier import DATA_DIR, FEATURE_COLUMNS, FIGURES_DIR, MODELS_DIR, REPORTS_DIR, SEED, build_features_and_label, set_seeds
 from train_classifier_real import load_or_fetch_real_data
+from training import fit
 
 DEADZONE_MULT = 0.3  # dead-zone del label = +-0.3 * vol_20 (ver README §3 para el analisis de balance de clases)
 
@@ -56,8 +57,9 @@ MIN_TRAIN_FRACTION = 0.50  # fraccion inicial de la serie reservada solo para el
 VAL_FRACTION_OF_TRAIN = 0.15  # cola del bloque de train de cada fold usada como validacion (early stopping)
 
 BATCH_SIZE = 256
-MAX_EPOCHS = 40
-PATIENCE = 6
+MIN_EPOCHS = 100  # ninguna red se detiene antes de 100 epocas
+MAX_EPOCHS = 300
+PATIENCE = 15
 LEARNING_RATE = 1e-3
 
 TRANSACTION_COST_BPS = 5.0  # comision taker tipica en Binance spot (~0.05%)
@@ -133,61 +135,23 @@ class FoldHistory:
 
 def train_fold(
     X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray, y_val: np.ndarray,
-    n_features: int, device: torch.device, seed: int = SEED,
+    n_features: int, device: torch.device, seed: int = SEED, fold_idx: int | None = None,
 ) -> tuple[Conv1DAttentionClassifier, FoldHistory]:
+    """Entrena un fold con el protocolo comun (``training.fit``): la validacion es
+    la cola del bloque de train del fold (anterior al test), al menos 100 epocas,
+    early stopping desde ahi, mejor epoca restaurada y checkpoint por epoca."""
     torch.manual_seed(seed)
     model = Conv1DAttentionClassifier(n_features=n_features).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    criterion = nn.CrossEntropyLoss()
 
-    train_loader = DataLoader(
-        TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train)),
-        batch_size=BATCH_SIZE, shuffle=True,
-    )
-    X_val_t = torch.from_numpy(X_val).to(device)
-    y_val_t = torch.from_numpy(y_val).to(device)
+    def val_metrics(logits: torch.Tensor) -> dict:
+        return {"val_accuracy": float((logits.argmax(dim=1).cpu().numpy() == y_val).mean())}
 
-    history = FoldHistory()
-    best_state = None
-    best_val_loss = float("inf")
-    patience_counter = 0
-
-    for epoch in range(1, MAX_EPOCHS + 1):
-        model.train()
-        epoch_loss = 0.0
-        for xb, yb in train_loader:
-            xb, yb = xb.to(device), yb.to(device)
-            optimizer.zero_grad()
-            logits = model(xb)
-            loss = criterion(logits, yb)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item() * xb.size(0)
-        train_loss = epoch_loss / len(X_train)
-
-        model.eval()
-        with torch.no_grad():
-            val_logits = model(X_val_t)
-            val_loss = criterion(val_logits, y_val_t).item()
-            val_pred = val_logits.argmax(dim=1).cpu().numpy()
-            val_acc = float((val_pred == y_val).mean())
-
-        history.train_loss.append(train_loss)
-        history.val_loss.append(val_loss)
-        history.val_accuracy.append(val_acc)
-
-        if val_loss < best_val_loss - 1e-6:
-            best_val_loss = val_loss
-            best_state = {k: v.clone() for k, v in model.state_dict().items()}
-            history.best_epoch = epoch
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            if patience_counter >= PATIENCE:
-                break
-
-    if best_state is not None:
-        model.load_state_dict(best_state)
+    ckpt = None if fold_idx is None else MODELS_DIR / "checkpoints" / f"walkforward_fold{fold_idx}.ckpt"
+    h = fit(model, nn.CrossEntropyLoss(), X_train, y_train, X_val, y_val, device,
+            batch_size=BATCH_SIZE, lr=LEARNING_RATE, seed=seed, val_metrics=val_metrics,
+            min_epochs=MIN_EPOCHS, max_epochs=MAX_EPOCHS, patience=PATIENCE, checkpoint_path=ckpt)
+    history = FoldHistory(train_loss=h["train_loss"], val_loss=h["val_loss"], val_accuracy=h["val_accuracy"],
+                          best_epoch=h["best_epoch"])
     return model, history
 
 
@@ -433,7 +397,7 @@ def main() -> None:
         X_val_s = scaler.transform(X_val.reshape(-1, n_features)).reshape(X_val.shape).astype(np.float32)
         X_test_s = scaler.transform(X_test.reshape(-1, n_features)).reshape(X_test.shape).astype(np.float32)
 
-        model, history = train_fold(X_train_s, y_train, X_val_s, y_val, n_features, device)
+        model, history = train_fold(X_train_s, y_train, X_val_s, y_val, n_features, device, fold_idx=fold_idx)
         last_fold_history = history
         print(f"  mejor epoch={history.best_epoch}  val_loss={history.val_loss[history.best_epoch - 1]:.4f}  "
               f"val_acc={history.val_accuracy[history.best_epoch - 1]:.3f}")

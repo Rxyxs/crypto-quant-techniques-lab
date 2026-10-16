@@ -297,7 +297,9 @@ concentra el gradiente en los más difíciles. Se entrena una vez por
 función de activación para comparar **ReLU**, **GELU**, y **Swish
 (SiLU)**:
 
-El GIF a continuacion recorre las mismas 60 epocas de entrenamiento cuadro por cuadro, con una etiqueta en vivo que muestra la perdida actual de cada activacion:
+Cada red entrena al menos 100 epocas full-batch (maximo 2.000); el early stopping mira un 15% estratificado de los titulares de entrenamiento, corta tras 50 epocas sin mejora y restaura la mejor epoca (entre la 23 y la 41 aqui), y el estado se guarda en un checkpoint cada 10 epocas. La activacion se elige con esa accuracy de validacion, no con los titulares de test. En estos titulares generados por plantilla todas las activaciones llegan a 1,000 en validacion y en test, asi que entrenar mas no cambia nada; la comparacion se mantiene para mostrar el metodo, no para ordenar las activaciones.
+
+El GIF a continuacion recorre las epocas de entrenamiento cuadro por cuadro, con una etiqueta en vivo que muestra la perdida actual de cada activacion:
 
 ![Curvas de perdida por activacion animadas](outputs/activation_loss_curves_animated.gif)
 

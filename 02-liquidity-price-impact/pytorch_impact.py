@@ -9,6 +9,8 @@ Run: venv/Scripts/python.exe pytorch_impact.py
 """
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -33,7 +35,11 @@ from persist_metrics import persist_metrics
 
 FIGURES_DIR = Path("outputs/figures")
 REPORTS_DIR = Path("outputs/reports")
-EPOCHS = 25
+MIN_EPOCHS = 100  # ninguna red se detiene antes de 100 epocas
+MAX_EPOCHS = 300
+PATIENCE = 15
+VAL_FRACTION = 0.15  # cola cronologica del train usada para early stopping
+CHECKPOINT_DIR = Path("outputs/models/checkpoints")
 LR = 1e-3
 WEIGHT_DECAY = 1e-2
 BATCH_SIZE = 256
@@ -72,31 +78,90 @@ class ImpactMLP(nn.Module):
         return self.net(x).squeeze(-1)
 
 
+def _fingerprint(*arrays, **config) -> str:
+    h = hashlib.sha256()
+    for a in arrays:
+        h.update(np.ascontiguousarray(np.asarray(a, dtype=np.float32)).tobytes())
+    h.update(json.dumps(config, sort_keys=True, default=str).encode())
+    return h.hexdigest()[:16]
+
+
 def train_model(X_train: np.ndarray, y_train: np.ndarray, activation: type[nn.Module],
-                 seed: int, epochs: int = EPOCHS) -> tuple[ImpactMLP, list[float]]:
+                 seed: int, epochs: int = MAX_EPOCHS, min_epochs: int = MIN_EPOCHS, patience: int = PATIENCE,
+                 checkpoint_path: Path | None = None, history_out: dict | None = None) -> tuple[ImpactMLP, list[float]]:
+    """Entrena con early stopping. La validacion es el ultimo ``VAL_FRACTION`` del
+    train en orden cronologico (anterior al test). Al menos ``min_epochs`` epocas;
+    desde ahi corta tras ``patience`` sin mejora y restaura la mejor epoca.
+    Con ``checkpoint_path`` el estado completo se guarda cada epoca y una corrida
+    interrumpida retoma donde quedo. Devuelve (modelo, loss de train por epoca);
+    ``history_out`` recibe ademas la loss de validacion y la mejor epoca."""
     torch.manual_seed(seed)
-    Xt = torch.tensor(X_train, dtype=torch.float32)
-    yt = torch.tensor(y_train, dtype=torch.float32)
-    dataset = torch.utils.data.TensorDataset(Xt, yt)
-    loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,
-                                          generator=torch.Generator().manual_seed(seed))
+    n_val = max(1, int(len(X_train) * VAL_FRACTION))
+    Xt = torch.tensor(X_train[:-n_val], dtype=torch.float32)
+    yt = torch.tensor(y_train[:-n_val], dtype=torch.float32)
+    Xv = torch.tensor(X_train[-n_val:], dtype=torch.float32)
+    yv = torch.tensor(y_train[-n_val:], dtype=torch.float32)
+    generator = torch.Generator()
+    loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(Xt, yt), batch_size=BATCH_SIZE,
+                                         shuffle=True, generator=generator)
 
     model = ImpactMLP(n_features=X_train.shape[1], activation=activation)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
-    loss_history = []
-    model.train()
-    for _ in range(epochs):
+    fp = _fingerprint(X_train, y_train, act=activation.__name__, seed=seed, epochs=epochs,
+                      min_epochs=min_epochs, patience=patience, lr=LR, wd=WEIGHT_DECAY, batch=BATCH_SIZE)
+    state = {"epoch": 0, "train": [], "val": [], "best_val": float("inf"), "best_epoch": 0,
+             "best_state": None, "bad_epochs": 0, "done": False}
+    if checkpoint_path is not None and Path(checkpoint_path).exists():
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        if ckpt.get("fingerprint") == fp:
+            model.load_state_dict(ckpt["model"])
+            optimizer.load_state_dict(ckpt["optimizer"])
+            state = ckpt["state"]
+
+    def save_checkpoint() -> None:
+        if checkpoint_path is None:
+            return
+        path = Path(checkpoint_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        torch.save({"fingerprint": fp, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                    "state": state}, tmp)
+        tmp.replace(path)
+
+    while not state["done"] and state["epoch"] < epochs:
+        generator.manual_seed(seed + state["epoch"])  # mismo orden de batches al retomar
+        torch.manual_seed(seed + 10_000 + state["epoch"])
+        model.train()
         epoch_losses = []
         for xb, yb in loader:
             optimizer.zero_grad()
-            pred = model(xb)
-            loss = huber_loss(pred, yb)
+            loss = huber_loss(model(xb), yb)
             loss.backward()
             optimizer.step()
             epoch_losses.append(loss.item())
-        loss_history.append(float(np.mean(epoch_losses)))
-    return model, loss_history
+        state["epoch"] += 1
+        state["train"].append(float(np.mean(epoch_losses)))
+        model.eval()
+        with torch.no_grad():
+            val_loss = huber_loss(model(Xv), yv).item()
+        state["val"].append(val_loss)
+        if val_loss < state["best_val"] - 1e-9:
+            state.update(best_val=val_loss, best_epoch=state["epoch"], bad_epochs=0,
+                         best_state=copy.deepcopy(model.state_dict()))
+        else:
+            state["bad_epochs"] += 1
+        if state["epoch"] >= min(min_epochs, epochs) and state["bad_epochs"] >= patience:
+            state["done"] = True
+        save_checkpoint()
+
+    if state["best_state"] is not None:
+        model.load_state_dict(state["best_state"])
+    state["done"] = True
+    save_checkpoint()
+    if history_out is not None:
+        history_out.update(val_loss=state["val"], best_epoch=state["best_epoch"], epochs_run=state["epoch"])
+    return model, state["train"]
 
 
 def evaluate(model: ImpactMLP, X_test: np.ndarray, y_test: np.ndarray, y_train_mean: float) -> tuple[dict, np.ndarray]:
@@ -124,8 +189,13 @@ def compare_activations(X_train: np.ndarray, y_train: np.ndarray, X_test: np.nda
     predictions = {}
     y_train_mean = float(y_train.mean())
     for name, activation in ACTIVATIONS.items():
-        model, loss_history = train_model(X_train, y_train, activation, seed)
+        info: dict = {}
+        model, loss_history = train_model(X_train, y_train, activation, seed,
+                                          checkpoint_path=CHECKPOINT_DIR / f"impact_{name}.ckpt", history_out=info)
+        print(f"  {name}: mejor epoca {info['best_epoch']} de {info['epochs_run']}")
         metrics, y_pred = evaluate(model, X_test, y_test, y_train_mean)
+        metrics["best_epoch"] = info["best_epoch"]
+        metrics["val_huber_loss"] = float(min(info["val_loss"]))
         results[name] = metrics
         loss_curves[name] = loss_history
         predictions[name] = y_pred
@@ -144,7 +214,8 @@ def multi_horizon_eval(df, feature_cols: list[str], horizons: list[int], activat
         X_test = scaler.transform(test_df.select(feature_cols).to_numpy())
         y_test = test_df[target_col].to_numpy()
 
-        model, _ = train_model(X_train, y_train, activation, seed)
+        model, _ = train_model(X_train, y_train, activation, seed,
+                               checkpoint_path=CHECKPOINT_DIR / f"impact_h{h}_{activation.__name__}.ckpt")
         metrics, _ = evaluate(model, X_test, y_test, float(y_train.mean()))
         results[h] = metrics
     return results
@@ -249,11 +320,12 @@ def main() -> None:
     X_test = scaler.transform(test_df.select(feature_cols).to_numpy())
     y_test = test_df[primary_target].to_numpy()
 
-    print(f"Training MLP with {list(ACTIVATIONS)} activations (custom Huber loss, {EPOCHS} epochs each)...")
+    print(f"Training MLP with {list(ACTIVATIONS)} activations (custom Huber loss, {MIN_EPOCHS}-{MAX_EPOCHS} epochs each, early stopping)...")
     activation_results, loss_curves, predictions = compare_activations(X_train, y_train, X_test, y_test, SEED)
     print(json.dumps(activation_results, indent=2))
 
-    best_activation = min(activation_results, key=lambda k: activation_results[k]["rmse"])
+    # Elegida con la loss de validacion (cola cronologica del train), no con el RMSE de test.
+    best_activation = min(activation_results, key=lambda k: activation_results[k]["val_huber_loss"])
     print(f"Best activation on primary horizon: {best_activation}")
 
     print("Running multi-horizon comparison with best activation (1 / 5 / 15 minutes ahead)...")
