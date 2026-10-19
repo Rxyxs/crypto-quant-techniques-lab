@@ -1,4 +1,4 @@
-[ 🇺🇸 English ] | [ 🇨🇱 Leer en Español ](README.es.md)
+[English ] | [[Español](README.es.md) ]
 
 # Crypto Quant Techniques Lab
 
