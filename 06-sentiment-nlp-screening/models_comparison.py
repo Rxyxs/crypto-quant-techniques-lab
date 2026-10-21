@@ -22,6 +22,8 @@ Outputs:
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -134,50 +136,121 @@ class FocalLoss(nn.Module):
         return focal.mean()
 
 
+MIN_EPOCHS = 100   # ninguna red se detiene antes de 100 epocas
+MAX_EPOCHS = 2000  # epocas full-batch: cada una es un solo paso de gradiente
+PATIENCE = 50
+VAL_FRACTION = 0.15
+CHECKPOINT_EVERY = 10
+CHECKPOINT_DIR = OUTPUT_DIR / "checkpoints"
+
+
+def _fingerprint(*arrays, **config) -> str:
+    h = hashlib.sha256()
+    for a in arrays:
+        h.update(np.ascontiguousarray(np.asarray(a, dtype=np.float32)).tobytes())
+    h.update(json.dumps(config, sort_keys=True, default=str).encode())
+    return h.hexdigest()[:16]
+
+
 def train_mlp(
-    X_train, y_train, X_test, y_test, activation_name="ReLU", epochs=60, lr=0.01, seed=SEED,
+    X_train, y_train, X_test, y_test, activation_name="ReLU", epochs=MAX_EPOCHS, lr=0.01, seed=SEED,
+    min_epochs=MIN_EPOCHS, patience=PATIENCE, checkpoint_path: Path | None = None,
 ):
-    """Train the MLP with the custom focal loss for one activation choice."""
+    """Train the MLP with the custom focal loss for one activation choice.
+
+    Early stopping watches a stratified ``VAL_FRACTION`` of the *training*
+    headlines; the test headlines are only used for the final metrics. At
+    least ``min_epochs`` epochs, then stop after ``patience`` epochs without
+    improvement and restore the best epoch. With ``checkpoint_path`` the state
+    is saved every ``CHECKPOINT_EVERY`` epochs and an interrupted run resumes."""
     torch.manual_seed(seed)
     activation = ACTIVATIONS[activation_name]
 
-    X_train_dense = torch.tensor(np.asarray(X_train.todense()), dtype=torch.float32)
+    fit_idx, val_idx = train_test_split(np.arange(len(y_train)), test_size=VAL_FRACTION,
+                                        stratify=y_train, random_state=seed)
+    X_dense = np.asarray(X_train.todense(), dtype=np.float32)
+    y_idx = np.array([LABEL_TO_IDX[y] for y in y_train])
+    X_fit = torch.tensor(X_dense[fit_idx])
+    y_fit = torch.tensor(y_idx[fit_idx], dtype=torch.long)
+    X_val = torch.tensor(X_dense[val_idx])
+    y_val = torch.tensor(y_idx[val_idx], dtype=torch.long)
     X_test_dense = torch.tensor(np.asarray(X_test.todense()), dtype=torch.float32)
-    y_train_idx = torch.tensor([LABEL_TO_IDX[y] for y in y_train], dtype=torch.long)
-    y_test_idx = torch.tensor([LABEL_TO_IDX[y] for y in y_test], dtype=torch.long)
 
-    model = SentimentMLP(input_dim=X_train_dense.shape[1], activation=activation)
+    model = SentimentMLP(input_dim=X_fit.shape[1], activation=activation)
     criterion = FocalLoss(gamma=2.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    loss_history = []
-    model.train()
-    for _ in range(epochs):
+    fp = _fingerprint(X_dense, y_idx, act=activation_name, epochs=epochs, lr=lr, seed=seed,
+                      min_epochs=min_epochs, patience=patience)
+    state = {"epoch": 0, "train": [], "val": [], "best_val": float("inf"), "best_epoch": 0,
+             "best_state": None, "bad_epochs": 0, "done": False}
+    if checkpoint_path is not None and Path(checkpoint_path).exists():
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        if ckpt.get("fingerprint") == fp:
+            model.load_state_dict(ckpt["model"])
+            optimizer.load_state_dict(ckpt["optimizer"])
+            state = ckpt["state"]
+
+    def save_checkpoint():
+        if checkpoint_path is None:
+            return
+        path = Path(checkpoint_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        torch.save({"fingerprint": fp, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                    "state": state}, tmp)
+        tmp.replace(path)
+
+    while not state["done"] and state["epoch"] < epochs:
+        model.train()
         optimizer.zero_grad()
-        logits = model(X_train_dense)
-        loss = criterion(logits, y_train_idx)
+        loss = criterion(model(X_fit), y_fit)
         loss.backward()
         optimizer.step()
-        loss_history.append(float(loss.item()))
+        state["epoch"] += 1
+        state["train"].append(float(loss.item()))
+        model.eval()
+        with torch.no_grad():
+            val_loss = float(criterion(model(X_val), y_val).item())
+        state["val"].append(val_loss)
+        if val_loss < state["best_val"] - 1e-7:
+            state.update(best_val=val_loss, best_epoch=state["epoch"], bad_epochs=0,
+                         best_state=copy.deepcopy(model.state_dict()))
+        else:
+            state["bad_epochs"] += 1
+        if state["epoch"] >= min(min_epochs, epochs) and state["bad_epochs"] >= patience:
+            state["done"] = True
+        if state["epoch"] % CHECKPOINT_EVERY == 0:
+            save_checkpoint()
+
+    model.load_state_dict(state["best_state"])
+    state["done"] = True
+    save_checkpoint()
 
     model.eval()
     with torch.no_grad():
-        test_logits = model(X_test_dense)
-        pred_idx = test_logits.argmax(dim=1).numpy()
+        val_acc = float((model(X_val).argmax(dim=1) == y_val).float().mean())
+        pred_idx = model(X_test_dense).argmax(dim=1).numpy()
     preds = [LABELS[i] for i in pred_idx]
 
     metrics = evaluate(y_test, preds)
-    metrics["loss_history"] = loss_history
+    metrics["loss_history"] = state["train"]
+    metrics["val_loss_history"] = state["val"]
+    metrics["best_epoch"] = state["best_epoch"]
+    metrics["val_accuracy"] = val_acc
     return model, preds, metrics
 
 
-def compare_activations(X_train, y_train, X_test, y_test, epochs=60):
+def compare_activations(X_train, y_train, X_test, y_test, epochs=MAX_EPOCHS, checkpoint_dir=None):
     """Train the MLP once per activation function, return metrics + curves for each."""
     results = {}
     for name in ACTIVATIONS:
+        ckpt = None if checkpoint_dir is None else Path(checkpoint_dir) / f"mlp_{name}.ckpt"
         _, preds, metrics = train_mlp(
-            X_train, y_train, X_test, y_test, activation_name=name, epochs=epochs
+            X_train, y_train, X_test, y_test, activation_name=name, epochs=epochs, checkpoint_path=ckpt,
         )
+        print(f"  {name}: mejor epoca {metrics['best_epoch']} de {len(metrics['loss_history'])}, "
+              f"val acc {metrics['val_accuracy']:.3f}, test acc {metrics['accuracy']:.3f}")
         results[name] = {"preds": preds, "metrics": metrics}
     return results
 
@@ -329,7 +402,7 @@ def persist_to_duckdb(comparison, predictions_df, db_path=DB_PATH):
     return metrics_df
 
 
-def run_comparison(csv_path=OUTPUT_DIR / "headline_sentiment.csv", epochs=60):
+def run_comparison(csv_path=OUTPUT_DIR / "headline_sentiment.csv", epochs=MAX_EPOCHS):
     OUTPUT_DIR.mkdir(exist_ok=True)
     df = load_headline_data(csv_path)
     idx_train, idx_test, headlines, true_labels = split_data(df)
@@ -339,8 +412,10 @@ def run_comparison(csv_path=OUTPUT_DIR / "headline_sentiment.csv", epochs=60):
 
     _, baseline_preds, baseline_metrics = train_baseline(X_train, y_train, X_test, y_test)
     _, ensemble_preds, ensemble_metrics = train_ensemble(X_train, y_train, X_test, y_test)
-    activation_results = compare_activations(X_train, y_train, X_test, y_test, epochs=epochs)
-    best_activation = max(activation_results, key=lambda k: activation_results[k]["metrics"]["accuracy"])
+    activation_results = compare_activations(X_train, y_train, X_test, y_test, epochs=epochs,
+                                             checkpoint_dir=CHECKPOINT_DIR)
+    # Chosen on validation accuracy (held out from train), not on test accuracy.
+    best_activation = max(activation_results, key=lambda k: activation_results[k]["metrics"]["val_accuracy"])
     mlp_preds = activation_results[best_activation]["preds"]
     mlp_metrics = activation_results[best_activation]["metrics"]
 

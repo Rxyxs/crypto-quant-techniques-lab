@@ -17,6 +17,9 @@ architecture, split, and seed, to see whether activation choice matters
 for this reconstruction task (§7 of the README reports the result).
 """
 
+import copy
+import hashlib
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -34,7 +37,10 @@ torch.manual_seed(SEED)
 pl.Config.set_tbl_formatting("ASCII_FULL")  # avoid Windows console cp1252 box-drawing errors
 
 HIDDEN_DIMS = (8, 3)  # encoder: input -> 8 -> 3 (bottleneck) -> 8 -> input
-EPOCHS = 60
+MIN_EPOCHS = 100  # ninguna red se detiene antes de 100 epocas
+MAX_EPOCHS = 300
+PATIENCE = 15
+CHECKPOINT_DIR = OUTPUT_DIR / "checkpoints"
 LR = 1e-3
 BATCH_SIZE = 128
 ACTIVATIONS = {"ReLU": nn.ReLU, "GELU": nn.GELU, "Swish": nn.SiLU}  # SiLU == Swish
@@ -75,29 +81,88 @@ def reconstruction_loss(x_hat, x):
     return ((x_hat - x) ** 2).mean(dim=1)
 
 
-def train_autoencoder(X_train, n_features, activation_name=DEFAULT_ACTIVATION, epochs=EPOCHS, seed=SEED):
+def _fingerprint(*arrays, **config) -> str:
+    h = hashlib.sha256()
+    for a in arrays:
+        if a is not None:
+            h.update(np.ascontiguousarray(np.asarray(a, dtype=np.float32)).tobytes())
+    h.update(json.dumps(config, sort_keys=True).encode())
+    return h.hexdigest()[:16]
+
+
+def train_autoencoder(X_train, n_features, activation_name=DEFAULT_ACTIVATION, epochs=MAX_EPOCHS, seed=SEED,
+                      X_val=None, min_epochs=MIN_EPOCHS, patience=PATIENCE, checkpoint_path=None,
+                      history_out=None):
+    """Entrena sin etiquetas. Con ``X_val`` (un tramo que el entrenamiento no
+    ve, tampoco etiquetado): al menos ``min_epochs`` epocas, desde ahi early
+    stopping sobre el error de reconstruccion de validacion y restauracion de la
+    mejor epoca. Con ``checkpoint_path`` el estado se guarda cada epoca y una
+    corrida interrumpida retoma donde quedo. Devuelve (modelo, loss de train)."""
     torch.manual_seed(seed)
     model = SpoofAutoencoder(n_features, ACTIVATIONS[activation_name])
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     X_tensor = torch.tensor(X_train, dtype=torch.float32)
+    X_val_t = None if X_val is None else torch.tensor(X_val, dtype=torch.float32)
 
-    model.train()
-    history = []
+    fp = _fingerprint(X_train, X_val, act=activation_name, epochs=epochs, seed=seed,
+                      min_epochs=min_epochs, patience=patience)
+    state = {"epoch": 0, "train": [], "val": [], "best_val": float("inf"), "best_epoch": 0,
+             "best_state": None, "bad_epochs": 0, "done": False}
+    if checkpoint_path is not None and Path(checkpoint_path).exists():
+        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        if ckpt.get("fingerprint") == fp:
+            model.load_state_dict(ckpt["model"])
+            optimizer.load_state_dict(ckpt["optimizer"])
+            state = ckpt["state"]
+
+    def save_checkpoint():
+        if checkpoint_path is None:
+            return
+        path = Path(checkpoint_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        torch.save({"fingerprint": fp, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                    "state": state}, tmp)
+        tmp.replace(path)
+
     n = X_tensor.shape[0]
-    for epoch in range(epochs):
+    while not state["done"] and state["epoch"] < epochs:
+        torch.manual_seed(seed + state["epoch"])  # misma permutacion al retomar
+        model.train()
         perm = torch.randperm(n)
         epoch_loss = 0.0
         for start in range(0, n, BATCH_SIZE):
             idx = perm[start:start + BATCH_SIZE]
             batch = X_tensor[idx]
             optimizer.zero_grad()
-            recon = model(batch)
-            loss = reconstruction_loss(recon, batch).mean()
+            loss = reconstruction_loss(model(batch), batch).mean()
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item() * len(idx)
-        history.append(epoch_loss / n)
-    return model, history
+        state["epoch"] += 1
+        state["train"].append(epoch_loss / n)
+        if X_val_t is not None:
+            model.eval()
+            with torch.no_grad():
+                val_loss = reconstruction_loss(model(X_val_t), X_val_t).mean().item()
+            state["val"].append(val_loss)
+            if val_loss < state["best_val"] - 1e-9:
+                state.update(best_val=val_loss, best_epoch=state["epoch"], bad_epochs=0,
+                             best_state=copy.deepcopy(model.state_dict()))
+            else:
+                state["bad_epochs"] += 1
+            if state["epoch"] >= min(min_epochs, epochs) and state["bad_epochs"] >= patience:
+                state["done"] = True
+        save_checkpoint()
+
+    if state["best_state"] is not None:
+        model.load_state_dict(state["best_state"])
+    state["done"] = True
+    save_checkpoint()
+    if history_out is not None:
+        history_out.update(val=state["val"], best_epoch=state["best_epoch"] or state["epoch"],
+                           epochs_run=state["epoch"])
+    return model, state["train"]
 
 
 def score_autoencoder(model, X):
@@ -121,8 +186,13 @@ def fit_predict_autoencoder(df, feature_cols=L2_FEATURE_COLS, contamination=0.02
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    X_train, _ = train_test_split(X_scaled, test_size=0.2, random_state=seed)
-    model, history = train_autoencoder(X_train, X_scaled.shape[1], activation_name=activation_name, seed=seed)
+    # El 20% reservado (sin etiquetas) sirve de validacion del error de reconstruccion para el early stopping.
+    X_train, X_val = train_test_split(X_scaled, test_size=0.2, random_state=seed)
+    info = {}
+    model, history = train_autoencoder(X_train, X_scaled.shape[1], activation_name=activation_name, seed=seed,
+                                       X_val=X_val, history_out=info,
+                                       checkpoint_path=CHECKPOINT_DIR / f"autoencoder_{activation_name}.ckpt")
+    print(f"  [{activation_name}] mejor epoca {info['best_epoch']} de {info['epochs_run']}")
 
     scores = score_autoencoder(model, X_scaled)
     threshold = np.quantile(scores, 1 - contamination)

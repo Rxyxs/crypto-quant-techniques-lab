@@ -251,13 +251,13 @@ for the multi-horizon run. All three models' metrics are persisted to
 |---|---:|---:|---:|---:|---:|---:|
 | Ridge linear baseline | 1 min | 0.000345 | 0.000239 | 0.063 | 0.000357 | 3.3% |
 | **XGBoost** | 1 min | **0.000338** | **0.000227** | **0.100** | 0.000357 | **5.2%** |
-| PyTorch MLP (best: Swish) | 1 min | 0.000356 | 0.000241 | −0.001 | 0.000357 | ~0% |
+| PyTorch MLP (best: Swish) | 1 min | 0.000357 | 0.000243 | −0.007 | 0.000357 | ~0% (worse) |
 | Ridge linear baseline | 5 min | 0.000907 | 0.000621 | −0.016 | 0.000903 | ~0% (worse) |
 | XGBoost | 5 min | 0.000904 | 0.000620 | −0.008 | 0.000903 | ~0% (worse) |
-| PyTorch MLP | 5 min | 0.000905 | 0.000621 | −0.011 | 0.000903 | ~0% (worse) |
+| PyTorch MLP | 5 min | 0.000902 | 0.000620 | −0.004 | 0.000903 | ~0% |
 | Ridge linear baseline | 15 min | 0.001563 | 0.001104 | −0.044 | 0.001548 | −1.0% |
 | XGBoost | 15 min | 0.001581 | 0.001112 | −0.068 | 0.001548 | −2.2% |
-| PyTorch MLP | 15 min | 0.001550 | 0.001092 | −0.027 | 0.001548 | −0.2% |
+| PyTorch MLP | 15 min | 0.001540 | 0.001084 | −0.013 | 0.001548 | 0.5% |
 
 At the 1-minute horizon, where the signal actually exists (§7.2), the
 ordering is XGBoost > Ridge > MLP: the non-linear tree ensemble captures
@@ -282,9 +282,15 @@ variance.
 ![PyTorch loss curves](outputs/figures/pytorch_loss_curves.png)
 
 Training Huber loss per epoch for all three activations on identical
-data/initialization — Swish converges to the lowest training loss of
-the three, consistent with it also winning the out-of-sample comparison
-above. The animated GIF draws each activation's curve epoch by epoch with a live loss readout.
+data/initialization. Each network trains at least 100 epochs (at most
+300); early stopping watches the last 15% of the training period (still
+before the test window), ends the run after 15 epochs without improvement
+and restores the best epoch, and the state is checkpointed every epoch.
+The activation is chosen on that validation loss, not on test RMSE.
+Validation loss bottoms out around epoch 20 for all three, so training
+longer than the previous fixed 25 epochs adds nothing: the MLP stays at
+the naive baseline at every horizon, and the three activations are
+indistinguishable (1-minute R² between −0.007 and −0.008). The animated GIF draws each activation's curve epoch by epoch with a live loss readout.
 
 ![PyTorch predicted vs actual](outputs/figures/pytorch_predicted_vs_actual.png)
 

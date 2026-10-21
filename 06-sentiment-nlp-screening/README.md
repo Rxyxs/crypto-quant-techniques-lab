@@ -286,7 +286,9 @@ headlines the model already classifies confidently and concentrates
 gradient on the harder ones. It is trained once per activation function
 to compare **ReLU**, **GELU**, and **Swish (SiLU)**:
 
-The GIF below races through the same 60 training epochs frame by frame, with a live label tracking each activation's current loss:
+Each network trains at least 100 full-batch epochs (at most 2,000); early stopping watches a stratified 15% of the training headlines, ends the run after 50 epochs without improvement and restores the best epoch (23-41 here), and the state is checkpointed every 10 epochs. The activation is chosen on that validation accuracy, not on the test headlines. On these template-generated headlines every activation reaches 1.000 on validation and test alike, so longer training changes nothing; the comparison is kept to show the method, not to rank the activations.
+
+The GIF below races through the training epochs frame by frame, with a live label tracking each activation's current loss:
 
 ![Activation loss curves animated](outputs/activation_loss_curves_animated.gif)
 

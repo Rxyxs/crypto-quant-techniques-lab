@@ -79,8 +79,8 @@ modesto ~60% de accuracy, no uno sospechosamente perfecto.
 
 | Métrica | Resultado | Qué significa |
 |---|---|---|
-| Accuracy / ROC-AUC de test sintético | 0,596 / 0,629 | Una ventaja real, modesta, del momentum AR(1) inyectado -- no saturada, mantenida creíble por los chequeos de leakage |
-| **Accuracy / ROC-AUC de test BTCUSDT real** | **0,519 / 0,536** | Apenas sobre el baseline aleatorio de 50% -- el resultado honesto y esperado al remover la señal de momentum sintética |
+| Accuracy / ROC-AUC de test sintético | 0,598 / 0,630 | Una ventaja real, modesta, del momentum AR(1) inyectado -- no saturada, mantenida creíble por los chequeos de leakage |
+| **Accuracy / ROC-AUC de test BTCUSDT real** | **0,524 / 0,542** | Apenas sobre el baseline aleatorio de 50% -- el resultado honesto y esperado al remover la señal de momentum sintética |
 | La función de activación ganadora cambia | Tanh (sintético) vs. ReLU (real) | Un hallazgo genuino de correr ambos regímenes, no afirmado a partir de un solo dataset |
 | >90% de accuracy se trata como | Una señal de alarma de leakage, no un descubrimiento | La filosofía de diseño explícita del proyecto, declarada, no implícita |
 
@@ -480,15 +480,15 @@ distintas aquí", no "Tanh es mejor".
 
 | Métrica | Valor |
 |---|---:|
-| Accuracy en test | 0,596 |
-| ROC-AUC en test | 0,629 |
-| Precision (alcista) | 0,629 |
-| Recall (alcista) | 0,602 |
-| Precision (bajista) | 0,561 |
-| Recall (bajista) | 0,588 |
+| Accuracy en test | 0,598 |
+| ROC-AUC en test | 0,630 |
+| Precision (alcista) | 0,628 |
+| Recall (alcista) | 0,614 |
+| Precision (bajista) | 0,565 |
+| Recall (bajista) | 0,579 |
 
 Un clasificador aleatorio en esta tarea balanceada (50/50) puntuaría 0,500
-de accuracy; el 0,596 refleja que el modelo captura una porción real, aunque
+de accuracy; el 0,598 refleja que el modelo captura una porción real, aunque
 modesta, del momentum AR(1) inyectado (φ = 0,30) a través de las features de
 retorno/momentum — consistente con el techo de ~0,60 de accuracy que implica
 la persistencia de signo de un proceso Gaussiano correlacionado a este φ, no
@@ -504,7 +504,7 @@ Un clasificador que reclame >90% de accuracy en dirección de la siguiente
 vela — sobre datos reales o sintéticos — debería tratarse como una señal de
 alerta de fuga de información antes que como un descubrimiento; las propias
 verificaciones anti-fuga de este proyecto (ver §5) son lo que hace creíble
-el 0,596 en vez de sospechoso.
+el 0,598 en vez de sospechoso.
 
 ## 7.5 Complemento con datos reales: ¿esto se sostiene sobre BTCUSDT real?
 
@@ -519,9 +519,9 @@ cronológico y el mismo entrenamiento ReLU-vs-Tanh usados en §7.1–§7.3.
 | Métrica | Sintético (§7.3) | **BTCUSDT real** |
 |---|---:|---:|
 | Activación ganadora | Tanh | ReLU |
-| Mejor ROC-AUC de validación | 0,627 | 0,534 |
-| Accuracy en test | 0,596 | **0,519** |
-| ROC-AUC en test | 0,629 | **0,536** |
+| Mejor ROC-AUC de validación | 0,627 | 0,537 |
+| Accuracy en test | 0,598 | **0,524** |
+| ROC-AUC en test | 0,630 | **0,542** |
 
 ![Matriz de confusion real](outputs/figures/confusion_matrix_real.png)
 
@@ -529,8 +529,8 @@ cronológico y el mismo entrenamiento ReLU-vs-Tanh usados en §7.1–§7.3.
 
 **Este es el hallazgo honesto al que apuntaba el disclaimer del §1–§2**:
 sobre velas reales de BTCUSDT, las mismas 14 features y el mismo
-clasificador denso llegan a 51,9% de accuracy y 0,536 de AUC — apenas por
-encima del baseline aleatorio de 50%, y muy por debajo del 59,6% / 0,629 de
+clasificador denso llegan a 52,4% de accuracy y 0,542 de AUC — apenas por
+encima del baseline aleatorio de 50%, y muy por debajo del 59,8% / 0,630 de
 la corrida sintética. La brecha no es un bug del pipeline; es el resultado
 esperado de remover el término de momentum AR(1) declarado (φ = 0,30) que
 hacía aprendible la tarea sintética en primer lugar. Los retornos horarios
@@ -554,14 +554,16 @@ matriz de confusión, y la curva de PnL) está en
 |---|---:|
 | Balance de clases (Bajista / Neutro / Alcista) | 34,5% / 29,8% / 35,8% |
 | Ventanas de test out-of-sample (5 folds, concatenados) | 9.978 |
-| **Accuracy (agregada, out-of-sample)** | **0,391** |
+| **Accuracy (agregada, out-of-sample)** | **0,395** |
 | Baseline aleatorio (3 clases) | 0,333 |
-| F1 macro (agregado) | 0,385 |
-| Cambios de posición totales ("trades") | 3.707 |
-| PnL bruto (sin costos), retorno log acumulado | +0,073 |
-| Costo total pagado (10 bps × trades) | 5,803 |
-| **PnL neto (con costo + slippage), retorno log acumulado** | **−5,730** |
-| Ratio Sharpe-like anualizado (neto) | −13,24 |
+| F1 macro (agregado) | 0,384 |
+| Cambios de posición totales ("trades") | 3.746 |
+| PnL bruto (sin costos), retorno log acumulado | +0,397 |
+| Costo total pagado (10 bps × trades) | 5,969 |
+| **PnL neto (con costo + slippage), retorno log acumulado** | **−5,572** |
+| Ratio Sharpe-like anualizado (neto) | −12,74 |
+
+**Protocolo de entrenamiento (todas las redes del proyecto, `training.py`).** La validación siempre es un tramo *anterior* al periodo de test (la cola del bloque de entrenamiento de cada fold en el walk-forward, el 15% posterior al train en §7.1-§7.5). Cada red entrena al menos 100 épocas (máximo 300); desde ahí, early stopping corta tras 15 épocas sin mejora y restaura la mejor época, y el estado completo se guarda en un checkpoint cada época para retomar una corrida interrumpida. La loss de validación toca su mínimo temprano — épocas 2 a 13 en los cinco folds del walk-forward, 2 a 34 en las redes densas — así que cada corrida devuelve esos pesos; frente al tope anterior de 40 épocas los resultados se mueven poco (accuracy agregada 0,391 → 0,395).
 
 ![Curva de aprendizaje walk-forward animada](outputs/figures/walkforward_learning_curves_animated.gif)
 
@@ -574,16 +576,16 @@ matriz de confusión, y la curva de PnL) está en
 Dos hallazgos, ambos reales y ninguno escondido:
 
 1. **La arquitectura más rica sí recupera una ventaja genuina, validada
-   con walk-forward, sobre el azar** — 39,1% de accuracy contra un
+   con walk-forward, sobre el azar** — 39,5% de accuracy contra un
    baseline de 33,3% para 3 clases balanceadas, consistente a través de los
-   5 folds (rango 37,6%–41,8% por fold, ver el notebook), no la coincidencia
+   5 folds (rango 38,2%–41,3% por fold, ver el notebook), no la coincidencia
    de un único split favorable.
 2. **Esa ventaja no sobrevive al contacto con costos de trading
-   realistas.** El PnL bruto está prácticamente plano (+0,073 de retorno
+   realistas.** El PnL bruto está prácticamente plano (+0,397 de retorno
    log acumulado sobre ~10.000 velas de test — apenas por encima del punto
    de equilibrio incluso antes de pagar nada por operar); neto de 10 bps
-   por cambio de posición a través de 3.707 trades, el PnL es claramente
-   negativo (−5,730, ratio Sharpe-like anualizado de −13,2). El modelo
+   por cambio de posición a través de 3.746 trades, el PnL es claramente
+   negativo (−5,572, ratio Sharpe-like anualizado de −12,7). El modelo
    cambia de opinión con la frecuencia suficiente, sobre una señal lo
    suficientemente débil, como para que solo los costos de transacción
    basten para convertir una ventaja estadística marginal en una pérdida
@@ -608,7 +610,7 @@ modelo, no el de los datos.
 |---|---:|---:|
 | Regresión Logística (baseline interpretable) | 0,596 | 0,629 |
 | LightGBM (ensamble de árboles) | 0,586 | 0,620 |
-| **Red densa — Tanh** (§7.3, ganador) | **0,596** | **0,629** |
+| **Red densa — Tanh** (§7.3, ganador) | **0,598** | **0,630** |
 
 ![Comparacion ROC de los tres enfoques](outputs/figures/roc_comparison_3models.png)
 
@@ -645,7 +647,7 @@ SELECT model, accuracy, roc_auc FROM model_comparison ORDER BY run_ts DESC;
   (0,625 vs. 0,627 de AUC de validación) — la elección de activación no fue
   el cuello de botella aquí.
 - **El modelo recupera una porción real y moderada de la señal de momentum
-  inyectada** (59,6% de accuracy en test contra un baseline aleatorio de
+  inyectada** (59,8% de accuracy en test contra un baseline aleatorio de
   50%), que es el resultado esperado y no inflado dado φ = 0,30 y la cota
   teórica de persistencia de signo para un proceso Gaussiano AR(1)
   correlacionado.
@@ -653,27 +655,27 @@ SELECT model, accuracy, roc_auc FROM model_comparison ORDER BY run_ts DESC;
   verificados, no asumidos** — la accuracy honesta y moderada del §7.3 es en
   sí misma evidencia contra la fuga de información; un pipeline con fuga
   sobre este tipo de features mostraría números mucho más altos.
-- **Sobre datos reales de BTCUSDT, el mismo pipeline llega a 51,9% de
-  accuracy / 0,536 de AUC** (§7.5) — apenas por encima del baseline
-  aleatorio, confirmando directamente en vez de solo declarar que el 59,6%
+- **Sobre datos reales de BTCUSDT, el mismo pipeline llega a 52,4% de
+  accuracy / 0,542 de AUC** (§7.5) — apenas por encima del baseline
+  aleatorio, confirmando directamente en vez de solo declarar que el 59,8%
   de la corrida sintética depende del término de momentum inyectado y
   declarado, y no representa una ventaja real y explotable sobre los
   mercados cripto reales.
 - **Una arquitectura más rica (Conv1D + Multi-Head Attention) y un esquema
   de validación más estricto (walk-forward) sí recuperan una ventaja
-  pequeña, estable y real** sobre BTCUSDT real — 39,1% de accuracy en un
+  pequeña, estable y real** sobre BTCUSDT real — 39,5% de accuracy en un
   problema balanceado de 3 clases contra un baseline aleatorio de 33,3%,
   consistente a través de los 5 folds walk-forward (§7.6) — pero **esa
   ventaja no sobrevive costos de transacción realistas**: el PnL neto
-  después de 10 bps/trade es marcadamente negativo (−5,730 de retorno log
-  acumulado, Sharpe-like de −13,2), aun cuando el PnL bruto antes de
+  después de 10 bps/trade es marcadamente negativo (−5,572 de retorno log
+  acumulado, Sharpe-like de −12,7), aun cuando el PnL bruto antes de
   costos está prácticamente plano. La arquitectura del modelo y el rigor
   de validación son necesarios pero no suficientes; la pregunta del costo
   de trading es una barra separada y más difícil, que este proyecto mide
   en vez de asumir superada.
 - **Ni la red densa ni un ensamble LightGBM superan a una simple Regresión
   Logística** sobre las 14 features sintéticas ya diseñadas a mano (§7.7,
-  0,596/0,629 tanto para Regresión Logística como para la red densa vs.
+  0,596/0,629 para Regresión Logística y 0,598/0,630 para la red densa vs.
   0,586/0,620 para LightGBM) — con la señal de momentum en sí lineal y las
   features ya pre-agregadas, la capacidad extra del modelo no tiene nada
   que explotar; es la entrada de secuencia cruda con ventanas del §7.6, no

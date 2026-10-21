@@ -25,7 +25,7 @@ Every number comes from an actual run of that folder's pipeline. Read the right-
 
 | # | Technique | Headline number | What it actually says |
 |---|---|---|---|
-| **01** | Direction classification | Real BTCUSDT accuracy **0.519**, ROC-AUC 0.536 | Barely above the 50% coin flip. On synthetic data with an injected AR(1) signal it reaches 0.596 — the gap between the two *is* the finding. The project treats **>90% accuracy as a leakage red flag, not a discovery** |
+| **01** | Direction classification | Real BTCUSDT accuracy **0.524**, ROC-AUC 0.542 | Barely above the 50% coin flip. On synthetic data with an injected AR(1) signal it reaches 0.598 — the gap between the two *is* the finding. The project treats **>90% accuracy as a leakage red flag, not a discovery** |
 | **02** | Liquidity & price impact | R² **0.100** at a 1-minute horizon, 5.2% RMSE reduction | Genuine but small skill, and it evaporates fast: at 5 minutes R² is −0.008 and at 15 minutes −0.068 — *worse than a naive forecast*. The horizon, not the model, decides whether there is anything to predict |
 | **03** | Pairs trading (cointegration) | Kalman **−12.2%** vs. static OLS **−43.7%** net | Both lose money. The dynamic hedge ratio cuts the loss 3.6x and the max drawdown from −51.6% to −21.4%, on 13 trades instead of 21. An improvement that is still a loss is reported as exactly that |
 | **04** | Portfolio optimization | Max-Sharpe **0.720**, allocating 74.6% BTC / 23.2% SOL / 2.2% BNB | A real, lopsided allocation from 24 months of actual Binance history — not the tidy diversified pie a textbook example produces |
@@ -75,7 +75,7 @@ Eight techniques, built independently, on the same market. They converge on one 
 > **The edge mostly isn't there — and the honest way to show that is to keep the negative results.**
 
 - **Frictions decide the ranking, not model quality.** In 08 the gradient-boosting model finishes last and the simplest technical rule finishes first, entirely because of turnover. In 03 the gross loss of −5.9% becomes −12.2% net.
-- **Accuracy is not profitability.** 0.507 signal accuracy in 08, net-negative Sharpe. 0.519 accuracy on real BTCUSDT in 01, against a 0.596 on synthetic data with a signal deliberately injected.
+- **Accuracy is not profitability.** 0.507 signal accuracy in 08, net-negative Sharpe. 0.524 accuracy on real BTCUSDT in 01, against a 0.598 on synthetic data with a signal deliberately injected.
 - **The horizon decides whether anything is predictable at all.** In 02, R² is 0.100 at one minute and *negative* at five and fifteen — the same model, the same features.
 - **Calibration beats defaults.** In 07, moving from a library's default 2% contamination to a 0.5% budget matched to one analyst's actual review capacity takes precision from 0.64 to 0.92.
 - **A high number is treated as a symptom.** 01 states outright that >90% accuracy on this problem would be read as a leakage red flag rather than a result.
